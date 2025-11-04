@@ -1,0 +1,20 @@
+// src/components/AreaFilter.jsx
+export default function AreaFilter({ items = [], onPick }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mt-3">
+      <div className="font-bold text-sm mb-2">Xem theo diện tích</div>
+      <ul className="space-y-2">
+        {items.map((x) => (
+          <li key={x}>
+            <button
+              onClick={() => onPick?.(x)}
+              className="text-blue-600 hover:underline text-[15px]"
+            >
+              {x}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
