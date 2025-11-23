@@ -1,11 +1,14 @@
-// src/components/ListingGrid.jsx
-import ListingCard from "./ListingCard.jsx";
+// src/components/listing/ListingGrid.jsx
+import ListingCard from "./ListingCard";
 
-export default function ListingGrid({ items = [] }) {
+export default function ListingGrid({ posts }) {
+  if (!Array.isArray(posts) || posts.length === 0) {
+    return <div className="py-10 text-center text-gray-500">Chưa có bài đăng</div>;
+  }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {items.map((it) => (
-        <ListingCard key={it.id} item={it} />
+    <div className="space-y-5">
+      {posts.map((p) => (
+        <ListingCard key={p.id} post={p} />
       ))}
     </div>
   );

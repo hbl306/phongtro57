@@ -1,31 +1,69 @@
-// src/components/Pagination.jsx
-export default function Pagination({ page = 1, total = 10, onChange }) {
-  const pages = Array.from({ length: total }, (_, i) => i + 1).slice(0, 6);
+// src/components/listing/Pagination.jsx
+import React from "react";
+
+/**
+ * Props:
+ * - page: trang hiện tại (1-based)
+ * - pageCount: tổng số trang
+ * - onPageChange: (nextPage: number) => void
+ */
+export default function Pagination({ page = 1, pageCount = 1, onPageChange }) {
+  // Nếu chỉ có 0 hoặc 1 trang thì không cần hiện phân trang
+  if (!pageCount || pageCount <= 1) return null;
+
+  const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
+
+  const goto = (p) => {
+    if (!onPageChange) return;
+    if (p < 1 || p > pageCount || p === page) return;
+    onPageChange(p);
+  };
+
   return (
-    <div className="flex items-center justify-center gap-2 mt-5">
+    <nav className="mt-6 flex items-center justify-center gap-2 select-none">
+      {/* Nút về trang trước */}
       <button
-        onClick={() => onChange?.(Math.max(1, page - 1))}
-        className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
+        type="button"
+        onClick={() => goto(page - 1)}
+        disabled={page <= 1}
+        className={`px-3 h-9 rounded-full border text-sm flex items-center justify-center ${
+          page <= 1
+            ? "border-gray-200 text-gray-300 cursor-default"
+            : "border-gray-200 text-gray-700 hover:bg-gray-50"
+        }`}
       >
-        Trước
+        ‹
       </button>
+
+      {/* Các nút số trang */}
       {pages.map((p) => (
         <button
           key={p}
-          onClick={() => onChange?.(p)}
-          className={`w-9 h-9 rounded-lg border text-sm ${
-            p === page ? "bg-orange-500 text-white border-orange-500" : "border-gray-200 hover:bg-gray-50"
+          type="button"
+          onClick={() => goto(p)}
+          className={`w-9 h-9 rounded-full border text-sm flex items-center justify-center ${
+            p === page
+              ? "bg-[#ff5e2e] border-[#ff5e2e] text-white font-semibold"
+              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
           }`}
         >
           {p}
         </button>
       ))}
+
+      {/* Nút sang trang sau */}
       <button
-        onClick={() => onChange?.(Math.min(total, page + 1))}
-        className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm hover:bg-gray-50"
+        type="button"
+        onClick={() => goto(page + 1)}
+        disabled={page >= pageCount}
+        className={`px-3 h-9 rounded-full border text-sm flex items-center justify-center ${
+          page >= pageCount
+            ? "border-gray-200 text-gray-300 cursor-default"
+            : "border-gray-200 text-gray-700 hover:bg-gray-50"
+        }`}
       >
-        Sau
+        ›
       </button>
-    </div>
+    </nav>
   );
 }

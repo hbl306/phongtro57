@@ -15,7 +15,7 @@ export default function AuthPage() {
       <Header />
 
       <main className="max-w-[1200px] mx-auto px-4 py-10">
-        <div className="max-w-[680px] mx-auto bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="max-w-[680px] mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Tabs */}
           <div className="grid grid-cols-2 text-center text-[22px] font-semibold">
             <NavLink
@@ -64,8 +64,8 @@ function FormField({ label, type = "text", placeholder, value, onChange }) {
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className="w-full rounded-xl border border-gray-300 focus:border-orange-400 focus:ring-2
-                   focus:ring-orange-100 px-4 py-3 outline-none"
+        className="w-full rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2
+                   focus:ring-orange-100 px-4 py-3 outline-none transition"
       />
     </div>
   );
@@ -92,30 +92,20 @@ function LoginForm() {
       setLoading(true);
       const res = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phone,
-          password: pw,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password: pw }),
       });
 
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.message || "Đăng nhập thất bại");
-      }
+      if (!res.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
       // lưu vào context + localStorage
       login({ token: data.token, user: data.user });
 
       // điều hướng theo role
-      if (data.user?.is_admin === 1) {
-        navigate("/he-thong/admin", { replace: true });
-      } else {
-        navigate("/", { replace: true });
-      }
+      const role = Number(data?.user?.role ?? 0);
+      if (role === 2) navigate("/admin", { replace: true });
+      else navigate("/", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -124,7 +114,7 @@ function LoginForm() {
   };
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="space-y-1">
       <FormField
         label="Số điện thoại"
         placeholder="09xx xxx xxx"
@@ -143,7 +133,7 @@ function LoginForm() {
 
       <button
         disabled={loading}
-        className="w-full bg-[#ff5e2e] hover:bg-[#ff4b14] text-white font-semibold py-3 rounded-full disabled:opacity-70"
+        className="w-full bg-[#ff5e2e] hover:bg-[#ff4b14] text-white font-semibold py-3 rounded-full disabled:opacity-70 transition"
       >
         {loading ? "Đang đăng nhập..." : "Đăng nhập"}
       </button>
@@ -155,7 +145,7 @@ function RegisterForm() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [pw, setPw] = useState("");
-  const [type, setType] = useState("tim-kiem");
+  const [role, setRole] = useState(0); // 0: Người thuê trọ, 1: Người cho thuê
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -176,31 +166,18 @@ function RegisterForm() {
       setLoading(true);
       const res = await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          phone,
-          password: pw,
-          account_type: type,
-        }),
+        headers: { "Content-Type": "application/json" },
+        // gửi role theo lựa chọn
+        body: JSON.stringify({ name, phone, password: pw, role }),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Đăng ký thất bại");
 
-      if (!res.ok) {
-        throw new Error(data.message || "Đăng ký thất bại");
-      }
+      setSuccess("Đăng ký thành công! Đang chuyển sang đăng nhập…");
+      setName(""); setPhone(""); setPw("");
 
-      setSuccess("Đăng ký thành công! Đang chuyển sang đăng nhập...");
-      setName("");
-      setPhone("");
-      setPw("");
-
-      setTimeout(() => {
-        navigate("/dang-nhap-tai-khoan");
-      }, 1500);
+      setTimeout(() => navigate("/dang-nhap-tai-khoan"), 1200);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -209,7 +186,7 @@ function RegisterForm() {
   };
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="space-y-2">
       <FormField
         label="Họ tên"
         placeholder="Nguyễn Văn A"
@@ -230,26 +207,44 @@ function RegisterForm() {
         onChange={(e) => setPw(e.target.value)}
       />
 
-      <div className="mt-2 mb-6">
+      {/* Loại tài khoản → role */}
+      <div className="mt-3 mb-6">
         <div className="text-[15px] text-gray-700 mb-2">Loại tài khoản</div>
-        <div className="flex items-center gap-6 text-[15px]">
-          {[
-            { v: "tim-kiem", label: "Tìm kiếm" },
-            { v: "chinh-chu", label: "Chính chủ" },
-            { v: "moi-gioi", label: "Môi giới" },
-          ].map((o) => (
-            <label key={o.v} className="inline-flex items-center gap-2 cursor-pointer">
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className={`border rounded-xl px-4 py-3 cursor-pointer transition
+                             ${role === 0 ? "border-orange-400 bg-orange-50" : "border-gray-200 hover:bg-gray-50"}`}>
+            <div className="flex items-center gap-3">
               <input
                 type="radio"
-                name="acct"
-                value={o.v}
-                checked={type === o.v}
-                onChange={() => setType(o.v)}
+                name="role"
                 className="accent-orange-500"
+                checked={role === 0}
+                onChange={() => setRole(0)}
               />
-              {o.label}
-            </label>
-          ))}
+              <div>
+                <div className="font-medium">Người thuê trọ</div>
+                <div className="text-xs text-gray-500">Tìm & đặt phòng</div>
+              </div>
+            </div>
+          </label>
+
+          <label className={`border rounded-xl px-4 py-3 cursor-pointer transition
+                             ${role === 1 ? "border-orange-400 bg-orange-50" : "border-gray-200 hover:bg-gray-50"}`}>
+            <div className="flex items-center gap-3">
+              <input
+                type="radio"
+                name="role"
+                className="accent-orange-500"
+                checked={role === 1}
+                onChange={() => setRole(1)}
+              />
+              <div>
+                <div className="font-medium">Người cho thuê</div>
+                <div className="text-xs text-gray-500">Đăng & quản lý tin</div>
+              </div>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -258,12 +253,12 @@ function RegisterForm() {
 
       <button
         disabled={loading}
-        className="w-full bg-[#ff5e2e] hover:bg-[#ff4b14] text-white font-semibold py-3 rounded-full disabled:opacity-70"
+        className="w-full bg-[#ff5e2e] hover:bg-[#ff4b14] text-white font-semibold py-3 rounded-full disabled:opacity-70 transition"
       >
         {loading ? "Đang tạo..." : "Tạo tài khoản"}
       </button>
 
-      <p className="mt-4 text-xs text-gray-500">
+      <p className="mt-4 text-xs text-gray-500 leading-5">
         Qua việc đăng nhập hoặc tạo tài khoản, bạn đồng ý với các điều khoản sử dụng và chính sách bảo mật.
       </p>
     </form>

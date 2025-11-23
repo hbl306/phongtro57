@@ -1,4 +1,3 @@
-// server/src/models/user.js
 "use strict";
 
 module.exports = (sequelize, DataTypes) => {
@@ -6,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     "User",
     {
       id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.INTEGER.UNSIGNED,
         autoIncrement: true,
         primaryKey: true,
       },
@@ -23,14 +22,24 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: false,
       },
-      is_admin: {
+
+    
+      role: {
         type: DataTypes.TINYINT,
+        allowNull: false,
+        defaultValue: 0,
+        comment: "0: renter, 1: host, 2: admin",
+      },
+
+      // ✅ số dư tài khoản
+      money: {
+        type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
       },
     },
     {
-      tableName: "users",              // đúng tên bảng trong phpMyAdmin
+      tableName: "users",
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",

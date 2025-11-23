@@ -2,39 +2,39 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import path from "path";
+
 import connectDatabase from "./src/config/connectDatabase.js";
 import authRoutes from "./src/routes/auth.js";
+import postRoutes from "./src/routes/post.js";
+import uploadRoutes from "./src/routes/upload.js"; 
+import adminRoutes from "./src/routes/admin.js";
 
 dotenv.config();
 
 const app = express();
 
-// CHỈ 1 middleware CORS thôi, và cho đúng origin 5173
 app.use(
   cors({
     origin: "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST","PATCH" ,"PUT", "DELETE", "OPTIONS"],
   })
 );
 
-// đọc JSON
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// route test để bạn mở trên browser
-app.get("/api/ping", (req, res) => {
-  res.json({ ok: true, msg: "API is alive" });
-});
-
-// auth routes
 app.use("/api/auth", authRoutes);
+app.use("/api/posts", postRoutes);
+app.use("/api/upload", uploadRoutes); 
 
-// root
-app.get("/", (req, res) => {
-  res.send("server on ...");
-});
+const uploadsDir = path.resolve(process.cwd(), "public", "uploads");
+app.use("/uploads", express.static(uploadsDir));
 
-// kết nối DB
+app.get("/api/ping", (req, res) => res.json({ ok: true }));
+app.use("/api/admin", adminRoutes);
+
+
 connectDatabase();
 
 const PORT = process.env.PORT || 5000;
