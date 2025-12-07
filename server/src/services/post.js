@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const db = require('../models');
-const { Post, Image, Video, User, WalletHistory } = db;
+const { Post, Image, Video, User, WalletHistory, Booking } = db;
 
 /* ---------- cost nhãn ---------- */
 const LABEL_COST = {
@@ -38,7 +38,7 @@ function parseRange(s) {
 }
 
 /* ---------- helper hết hạn: createdAt + star (ngày) ---------- */
-const EXPIRABLE_STATUSES = ['pending', 'approved', 'booking', 'booked'];
+const EXPIRABLE_STATUSES = ['pending', 'approved'];
 
 function calcExpireAt(createdAt, star) {
   if (!createdAt) return null;
@@ -93,14 +93,12 @@ async function logWalletHistory({
     const options = t ? { transaction: t } : {};
     await WalletHistory.create(payload, options);
   } catch (e) {
-    // Không để lỗi log làm hỏng giao dịch chính
     console.error('logWalletHistory error:', e.message);
   }
 }
 
 /* ============================================================
  *  createPost: Tạo bài + trừ tiền label + ghi wallet_history
- *  (luôn tạo post mới, id mới)
  * ==========================================================*/
 exports.createPost = async (payload, userId) => {
   const t = await db.sequelize.transaction();
@@ -119,7 +117,6 @@ exports.createPost = async (payload, userId) => {
       contact_phone,
       price,
       area,
-      // mảng features (ví dụ: ["parking","elevator"] hoặc ["Chỗ để xe",...])
       features = [],
       imageUrls = [],
       videoUrl = null,
@@ -127,21 +124,18 @@ exports.createPost = async (payload, userId) => {
       action,
     } = payload;
 
-    // Action để ghi lịch sử ví
     const historyAction = walletAction || action || 'POST_CREATE';
 
-    // 1) Tính phí nhãn
+    // phí nhãn
     const trimmedLabel = (labelCode || '').toUpperCase().trim();
     const cost = LABEL_COST[trimmedLabel] || 0;
 
-    // 1.5) Đặt status + star theo rule
-    //  - Không label:  status = pending, star = 1
-    //  - Có label:     status = approved, star = 3
+    // status + star ban đầu
     const hasLabel = !!trimmedLabel;
     const initialStatus = hasLabel ? 'approved' : 'pending';
     const initialStar = hasLabel ? 3 : 1;
 
-    // 2) Nếu có phí -> lock user & trừ tiền
+    // trừ tiền nếu có
     let newBalance;
     let balanceBefore = null;
     let balanceAfter = null;
@@ -170,7 +164,7 @@ exports.createPost = async (payload, userId) => {
       await user.save({ transaction: t });
     }
 
-    // 3) Tạo bài đăng
+    // tạo post
     const post = await Post.create(
       {
         title,
@@ -194,7 +188,7 @@ exports.createPost = async (payload, userId) => {
       { transaction: t }
     );
 
-    // 4) Ảnh
+    // ảnh
     if (Array.isArray(imageUrls) && imageUrls.length) {
       const rows = imageUrls.map((url, idx) => ({
         postId: post.id,
@@ -205,17 +199,17 @@ exports.createPost = async (payload, userId) => {
       await Image.bulkCreate(rows, { transaction: t });
     }
 
-    // 5) Video
+    // video
     if (videoUrl) {
       await Video.create({ postId: post.id, url: videoUrl }, { transaction: t });
     }
 
-    // 6) Ghi lịch sử ví nếu có trừ tiền
+    // log ví
     if (cost > 0 && balanceBefore != null && balanceAfter != null) {
       await logWalletHistory({
         t,
         userId,
-        action: historyAction, // POST_CREATE (mặc định)
+        action: historyAction,
         amountIn: 0,
         amountOut: cost,
         balanceBefore,
@@ -237,10 +231,7 @@ exports.createPost = async (payload, userId) => {
 };
 
 /* ============================================================
- *  repostPost: ĐĂNG LẠI tin (GIỮ NGUYÊN post.id)
- *  - Cập nhật lại nội dung giống createPost
- *  - Reset status, star, createdAt
- *  - Tính phí nhãn, trừ tiền & ghi wallet_history (POST_REPOST)
+ *  repostPost: Đăng lại tin (giữ nguyên id)
  * ==========================================================*/
 exports.repostPost = async (postId, payload, userId) => {
   const t = await db.sequelize.transaction();
@@ -311,7 +302,7 @@ exports.repostPost = async (postId, payload, userId) => {
       await user.save({ transaction: t });
     }
 
-    // Cập nhật lại nội dung bài (giống tạo mới, nhưng giữ nguyên id)
+    // cập nhật nội dung
     post.title = title;
     post.categoryCode = categoryCode;
     post.description = description;
@@ -328,13 +319,15 @@ exports.repostPost = async (postId, payload, userId) => {
     post.labelCode = trimmedLabel || null;
     post.status = initialStatus;
     post.star = initialStar;
-    post.createdAt = new Date(); // ngày đăng mới
+
+    const now = new Date();
+    post.setDataValue('createdAt', now);
+    post.changed('createdAt', true);
 
     await post.save({ transaction: t });
 
-    // Cập nhật ảnh: xoá hết rồi tạo lại
+    // ảnh
     await Image.destroy({ where: { postId: post.id }, transaction: t });
-
     if (Array.isArray(imageUrls) && imageUrls.length) {
       const rows = imageUrls.map((url, idx) => ({
         postId: post.id,
@@ -345,14 +338,13 @@ exports.repostPost = async (postId, payload, userId) => {
       await Image.bulkCreate(rows, { transaction: t });
     }
 
-    // Cập nhật video: xoá hết rồi tạo lại nếu có
+    // video
     await Video.destroy({ where: { postId: post.id }, transaction: t });
-
     if (videoUrl) {
       await Video.create({ postId: post.id, url: videoUrl }, { transaction: t });
     }
 
-    // Ghi log ví nếu có trừ tiền
+    // log ví
     if (cost > 0 && balanceBefore != null && balanceAfter != null) {
       await logWalletHistory({
         t,
@@ -382,7 +374,7 @@ exports.getPosts = async (query = {}) => {
   const where = {};
   const andConditions = [];
 
-  /* ---- trạng thái bài ---- */
+  /* trạng thái */
   if (query.status) {
     const s = String(query.status);
     if (s === 'public') {
@@ -392,21 +384,19 @@ exports.getPosts = async (query = {}) => {
     }
   }
 
-  /* ---- danh mục ---- */
+  /* danh mục */
   if (query.category) {
     where.categoryCode = String(query.category).toUpperCase();
   }
 
-  /* ---- tỉnh ---- */
+  /* tỉnh */
   if (query.province) {
     const raw = String(query.province);
-    const pv =
-      PROVINCE_SLUG_MAP[raw.toLowerCase()] ||
-      raw;
+    const pv = PROVINCE_SLUG_MAP[raw.toLowerCase()] || raw;
     where.province = { [Op.like]: `%${pv}%` };
   }
 
-  /* ---- quận / huyện, phường / xã ---- */
+  /* quận / huyện, phường / xã */
   if (query.district) {
     where.district = { [Op.like]: `%${query.district}%` };
   }
@@ -415,7 +405,7 @@ exports.getPosts = async (query = {}) => {
     where.ward = { [Op.like]: `%${query.ward}%` };
   }
 
-  /* ---- khoảng giá ---- */
+  /* khoảng giá */
   if (query.price) {
     const { min, max } = parseRange(query.price);
     if (min && max) where.price = { [Op.between]: [min, max] };
@@ -423,7 +413,7 @@ exports.getPosts = async (query = {}) => {
     else if (max) where.price = { [Op.lte]: max };
   }
 
-  /* ---- khoảng diện tích ---- */
+  /* khoảng diện tích */
   if (query.area) {
     const { min, max } = parseRange(query.area);
     if (min && max) where.area = { [Op.between]: [min, max] };
@@ -431,7 +421,7 @@ exports.getPosts = async (query = {}) => {
     else if (max) where.area = { [Op.lte]: max };
   }
 
-  /* ---- features ---- */
+  /* features */
   if (query.features) {
     const feats = Array.isArray(query.features)
       ? query.features
@@ -517,7 +507,7 @@ exports.getPosts = async (query = {}) => {
 };
 
 /* ============================================================
- *  getPostById: lấy chi tiết 1 bài
+ *  getPostById: chi tiết 1 bài
  * ==========================================================*/
 exports.getPostById = async (id) => {
   const post = await Post.findByPk(id, {
@@ -542,7 +532,6 @@ exports.getPostById = async (id) => {
   }
 
   await ensureExpiredIfNeeded(post);
-
   return post;
 };
 
@@ -627,7 +616,7 @@ exports.updatePost = async (postId, payload, userId) => {
 };
 
 /* ============================================================
- *  updateLabel: gắn / đổi nhãn cho bài đăng + log ví
+ *  updateLabel: gắn / đổi nhãn
  * ==========================================================*/
 exports.updateLabel = async (postId, labelCode, userId) => {
   const t = await db.sequelize.transaction();
@@ -707,7 +696,7 @@ exports.updateLabel = async (postId, labelCode, userId) => {
 };
 
 /* ============================================================
- *  extendPost: gia hạn bài đăng (tăng star, trừ tiền) + log ví
+ *  extendPost: gia hạn bài đăng
  * ==========================================================*/
 exports.extendPost = async (postId, days, userId) => {
   const t = await db.sequelize.transaction();
@@ -879,9 +868,129 @@ exports.hidePost = async (postId, userId) => {
 };
 
 /* ============================================================
+ *  bookPost: người thuê ĐẶT PHÒNG
+ *  - Tiền cọc = 30% giá phòng (làm tròn 10.000đ)
+ *  - Trừ tiền user + ghi wallet_history(action = 'BOOKING')
+ *  - Cập nhật post.status = 'booking'
+ *  - Tạo 1 booking (pending, expiresAt = createdAt + 2 ngày xấp xỉ)
+ * ==========================================================*/
+exports.bookPost = async (postId, userId) => {
+  const t = await db.sequelize.transaction();
+  try {
+    const post = await Post.findByPk(postId, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (!post) {
+      const err = new Error('Không tìm thấy bài đăng');
+      err.status = 404;
+      throw err;
+    }
+
+    // không cho tự đặt phòng tin của mình
+    if (Number(post.userId) === Number(userId)) {
+      const err = new Error('Bạn không thể tự đặt phòng tin của mình');
+      err.status = 400;
+      throw err;
+    }
+
+    // chỉ tin đang hiển thị mới được đặt
+    if (post.status !== 'approved') {
+      const err = new Error('Chỉ có thể đặt phòng với tin đang hiển thị');
+      err.status = 400;
+      throw err;
+    }
+
+    const price = Number(post.price || 0);
+    if (!price || price <= 0) {
+      const err = new Error('Tin này chưa có giá, không thể đặt phòng');
+      err.status = 400;
+      throw err;
+    }
+
+    // tiền cọc = 30% giá phòng, làm tròn đến hàng chục nghìn
+    const rawDeposit = Math.round(price * 0.3);
+    const unit = 10000;
+    const deposit = rawDeposit > 0 ? Math.round(rawDeposit / unit) * unit : 0;
+
+    const user = await User.findByPk(userId, {
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (!user) {
+      const err = new Error('Không tìm thấy người dùng');
+      err.status = 404;
+      throw err;
+    }
+
+    const balance = Number(user.money || 0);
+    if (balance < deposit) {
+      await t.rollback();
+      const err = new Error('Số dư tài khoản không đủ');
+      err.code = 'INSUFFICIENT_BALANCE';
+      err.balance = balance;
+      err.needed = deposit;
+      throw err;
+    }
+
+    const balanceBefore = balance;
+    const balanceAfter = balance - deposit;
+
+    // trừ tiền
+    user.money = balanceAfter;
+    await user.save({ transaction: t });
+
+    // cập nhật trạng thái post
+    post.status = 'booking';
+    await post.save({ transaction: t });
+
+    // thời điểm tạo + expiresAt = createdAt + 2 ngày (xấp xỉ)
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+    const booking = await Booking.create(
+      {
+        postId: post.id,
+        userId,
+        depositAmount: deposit,
+        expiresAt,
+        confirmedAt: null,
+        status: 'pending',
+      },
+      { transaction: t }
+    );
+
+    // log ví
+    await logWalletHistory({
+      t,
+      userId,
+      action: 'BOOKING',
+      amountIn: 0,
+      amountOut: deposit,
+      balanceBefore,
+      balanceAfter,
+      refType: 'BOOKING',
+      note: `Đặt cọc phòng cho tin #${post.id} (booking #${booking.id})`,
+    });
+
+    await t.commit();
+    return {
+      booking,
+      post,
+      charged: deposit,
+      balance: balanceAfter,
+    };
+  } catch (err) {
+    await t.rollback();
+    throw err;
+  }
+};
+
+/* ============================================================
  *  Các hàm dành riêng cho ADMIN
  * ==========================================================*/
-
 exports.approvePostByAdmin = async (postId) => {
   const post = await Post.findByPk(postId);
   if (!post) return null;

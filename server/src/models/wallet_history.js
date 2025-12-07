@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
           "POST_LABEL",       // Gắn / đổi nhãn
           "POST_EXTEND",      // Gia hạn
           "POST_REPOST",      // Đăng lại
-          "DEPOSIT",          // Nạp tiền
+          "RECHARGE",          // Nạp tiền
           "WITHDRAW",         // Rút tiền
           "BOOKING",          // Đặt phòng
           "REFUND",           // Hoàn tiền

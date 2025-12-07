@@ -2,6 +2,7 @@
 import { Link } from "react-router-dom";
 import fallbackImg from "../../assets/logopost.jpg";
 import { useAuth } from "../../containers/Public/AuthContext.jsx";
+import useSavedPosts from "../../store/useSavedPosts.js";
 
 // 🔥 icon nhãn
 import HOT_ICON from "../../assets/HOT.png";
@@ -50,7 +51,7 @@ function titleColorClass(labelCode) {
     case "VIP3":
       return "text-blue-500";
     default:
-      return "text-amber-800"; // nâu nâu
+      return "text-amber-800";
   }
 }
 
@@ -71,15 +72,12 @@ function labelIcon(labelCode) {
   }
 }
 
-/** Card bài đăng
- *  variant = "default" | "hot"
- *  - "hot": dùng trong khung tin HOT nổi bật
- */
+/** Card bài đăng */
 export default function ListingCard({ post, variant = "default" }) {
   const { user } = useAuth();
+  const { isSaved, toggleSave } = useSavedPosts();
 
-  // role: 0 = Người thuê trọ, 1 = Người cho thuê, 2 = Admin
-  const role = user?.role;
+  const role = user?.role; // 0: Người thuê, 1: Cho thuê, 2: Admin
   const isLandlord = role === 1;
 
   const isOwnPost =
@@ -90,7 +88,17 @@ export default function ListingCard({ post, variant = "default" }) {
     return null;
   }
 
-  const imgs = Array.isArray(post.images) ? post.images.filter(Boolean) : [];
+  const saved = isSaved(post.id);
+
+
+  const imgs = Array.isArray(post.images)
+    ? post.images
+        .map((img) =>
+          typeof img === "string" ? img : img?.url
+        )
+        .filter(Boolean)
+    : [];
+
   const img1 = imgs[0] || fallbackImg;
   const img2 = imgs[1];
   const img3 = imgs[2];
@@ -107,11 +115,18 @@ export default function ListingCard({ post, variant = "default" }) {
     ) : null;
 
   const wrapperClass =
-    variant === "hot"
+    (variant === "hot"
       ? "block w-full rounded-2xl border border-red-300 bg-white shadow-md hover:shadow-lg hover:-translate-y-[1px] transition-all"
-      : "block w-full rounded-2xl border border-gray-200 bg-white shadow-[0_1px_0_#eef] hover:shadow-md hover:-translate-y-[1px] transition-all";
+      : "block w-full rounded-2xl border border-gray-200 bg-white shadow-[0_1px_0_#eef] hover:shadow-md hover:-translate-y-[1px] transition-all") +
+    " relative";
 
   const iconSrc = labelIcon(post.labelCode);
+
+  const handleToggleSave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSave(post); // ✅ truyền cả object
+  };
 
   return (
     <Link to={`/bai-dang/${post.id}`} className={wrapperClass}>
@@ -163,7 +178,7 @@ export default function ListingCard({ post, variant = "default" }) {
         {/* RIGHT: Nội dung */}
         <div className="col-span-12 md:col-span-7 flex flex-col justify-between">
           <div className="space-y-1.5">
-            {/* ⭐ Tiêu đề + icon nhãn trên cùng 1 dòng (icon bám dòng đầu) */}
+            {/* Tiêu đề + icon nhãn */}
             <div className="flex items-start gap-2">
               {iconSrc && (
                 <img
@@ -186,7 +201,9 @@ export default function ListingCard({ post, variant = "default" }) {
               <span className="text-emerald-600 font-semibold">
                 {formatPrice(post.price)}
               </span>
-              <span className="text-gray-500">{formatArea(post.area)}</span>
+              <span className="text-gray-500">
+                {formatArea(post.area)}
+              </span>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -208,16 +225,58 @@ export default function ListingCard({ post, variant = "default" }) {
             <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500">
               👤
             </span>
-            <span className="font-medium">{post.contactName || "—"}</span>
-            {post.contactPhone ? (
+            <span className="font-medium">
+              {post.contactName || post.contact_name || "—"}
+            </span>
+            {post.contactPhone || post.contact_phone ? (
               <span className="ml-1 px-2 py-1 text-[12px] rounded-full bg-emerald-50 text-emerald-700">
-                {post.contactPhone}
+                {post.contactPhone || post.contact_phone}
               </span>
             ) : null}
-            <span className="ml-2 text-gray-500">{timeAgo(post.createdAt)}</span>
+            <span className="ml-2 text-gray-500">
+              {timeAgo(post.createdAt)}
+            </span>
           </div>
         </div>
       </div>
+
+      {/* Icon LƯU / BỎ LƯU – chỉ cho Người thuê trọ */}
+      {role === 0 && (
+        <button
+          type="button"
+          onClick={handleToggleSave}
+          className="absolute bottom-4 right-4 rounded-full bg-white/95 p-2 shadow-sm hover:bg-white"
+        >
+          {saved ? (
+            // tim đầy (đỏ)
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5 text-red-500"
+              fill="currentColor"
+            >
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 
+                       4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 
+                       14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 
+                       6.86-8.55 11.54L12 21.35z" />
+            </svg>
+          ) : (
+            // tim viền (xám)
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <path
+                d="M12.1 8.64l-.1.1-.11-.11C10.14 6.6 7.1 6.6 5.14 8.56 3.18 10.53 
+                   3.18 13.57 5.14 15.53L12 22l6.86-6.47c1.96-1.96 
+                   1.96-5 0-6.97-1.96-1.96-5-1.96-6.96 0z"
+              />
+            </svg>
+          )}
+        </button>
+      )}
     </Link>
   );
 }

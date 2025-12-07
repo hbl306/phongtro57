@@ -78,3 +78,71 @@ export const loginService = async ({ phone, password }) => {
     token,
   };
 };
+
+// ---------- CẬP NHẬT THÔNG TIN CÁ NHÂN ----------
+export const updateProfileService = async (userId, { name }) => {
+  const user = await db.User.findByPk(userId);
+  if (!user) {
+    return { err: 1, message: "Không tìm thấy người dùng." };
+  }
+
+  user.name = name;
+  await user.save();
+
+  return {
+    err: 0,
+    user: exposeUser(user),
+  };
+};
+
+// ---------- ĐỔI MẬT KHẨU ----------
+export const changePasswordService = async (
+  userId,
+  oldPassword,
+  newPassword
+) => {
+  const user = await db.User.findByPk(userId);
+  if (!user) {
+    return { err: 1, message: "Không tìm thấy người dùng." };
+  }
+
+  const isMatch = await bcrypt.compare(oldPassword, user.password || "");
+  if (!isMatch) {
+    return { err: 1, message: "Mật khẩu cũ không đúng." };
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  user.password = hashed;
+  await user.save();
+
+  return {
+    err: 0,
+    message: "Đổi mật khẩu thành công.",
+  };
+};
+
+// ---------- ĐỔI VAI TRÒ (0: Người thuê, 1: Người cho thuê) ----------
+export const changeRoleService = async (userId, role) => {
+  const user = await db.User.findByPk(userId);
+  if (!user) {
+    return { err: 1, message: "Không tìm thấy người dùng." };
+  }
+
+  // Không cho đổi role admin từ UI
+  if (Number(user.role) === 2) {
+    return {
+      err: 1,
+      message: "Không thể đổi vai trò của tài khoản quản trị viên.",
+    };
+  }
+
+  const safeRole = Number(role) === 1 ? 1 : 0;
+  user.role = safeRole;
+  await user.save();
+
+  return {
+    err: 0,
+    message: "Đổi vai trò thành công.",
+    user: exposeUser(user),
+  };
+};

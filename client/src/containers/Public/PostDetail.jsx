@@ -1,11 +1,24 @@
 // src/containers/Public/PostDetail.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import CategoryTabs from "../../components/filters/CategoryTabs";
 import MediaGallery from "../../components/media/MediaGallery";
 import { getPostById } from "../../services/postService";
-import Footer from  "../../components/layout/Footer";
+import Footer from "../../components/layout/Footer";
+
+import HotLabel from "../../assets/HOT.png";
+import Vip1Label from "../../assets/VIP1.png";
+import Vip2Label from "../../assets/VIP2.png";
+import Vip3Label from "../../assets/VIP3.png";
+import DefaultLabel from "../../assets/logopost.jpg";
+
+import LabelModal from "../../utils/LabelModal.jsx";
+import ExtendModal from "../../utils/ExtendModal.jsx";
+import HidePostModal from "../../utils/HidePostModal.jsx";
+import BookingModal from "../../utils/BookingModal.jsx";
+import { useAuth } from "./AuthContext.jsx";
+
 function formatPrice(p) {
   if (p == null) return "—";
   const tr = p / 1_000_000;
@@ -29,10 +42,58 @@ function timeAgo(iso) {
 }
 const CleanPhone = (s = "") => (s.match(/\d+/g) || []).join("");
 
+// logo + màu tiêu đề theo label
+const LABEL_CONFIG = {
+  HOT: {
+    color: "#e53935",
+    icon: HotLabel,
+  },
+  VIP1: {
+    color: "#e83e8c",
+    icon: Vip1Label,
+  },
+  VIP2: {
+    color: "#f9a825",
+    icon: Vip2Label,
+  },
+  VIP3: {
+    color: "#1a73e8",
+    icon: Vip3Label,
+  },
+  DEFAULT: {
+    color: "#8b5e3c",
+    icon: DefaultLabel,
+  },
+};
+
+function getLabelInfo(post) {
+  const raw =
+    (post?.label ||
+      post?.labelCode ||
+      post?.labelType ||
+      post?.labelName ||
+      "") + "";
+  const key = raw.toUpperCase();
+  if (key === "HOT") return LABEL_CONFIG.HOT;
+  if (key === "VIP1") return LABEL_CONFIG.VIP1;
+  if (key === "VIP2") return LABEL_CONFIG.VIP2;
+  if (key === "VIP3") return LABEL_CONFIG.VIP3;
+  return LABEL_CONFIG.DEFAULT;
+}
+
 export default function PostDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // state mở 4 modal
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [hideModalOpen, setHideModalOpen] = useState(false);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -50,9 +111,7 @@ export default function PostDetail() {
 
   const mapSrc = useMemo(() => {
     const q = encodeURIComponent(post?.address || "");
-    return q
-      ? `https://www.google.com/maps?q=${q}&output=embed`
-      : "";
+    return q ? `https://www.google.com/maps?q=${q}&output=embed` : "";
   }, [post]);
 
   if (loading) {
@@ -78,12 +137,65 @@ export default function PostDetail() {
   }
 
   const zalo = `https://zalo.me/${CleanPhone(post.contactPhone)}`;
+  const { color: titleColor, icon: labelIcon } = getLabelInfo(post);
+  const isLandlord = user?.role === 1;
+
+  // callback sau khi modal gắn nhãn / gia hạn / ẩn tin
+  const handleLabelUpdated = (payload) => {
+    if (!payload) return;
+    setPost((prev) =>
+      prev ? { ...prev, labelCode: payload.labelCode } : prev
+    );
+  };
+
+  const handleExtendUpdated = (payload) => {
+    if (!payload) return;
+    setPost((prev) =>
+      prev
+        ? {
+            ...prev,
+            star: payload.star,
+            status: payload.status,
+            createdAt: payload.createdAt,
+          }
+        : prev
+    );
+  };
+
+  const handleHideUpdated = (payload) => {
+    if (!payload) return;
+    setPost((prev) => (prev ? { ...prev, status: payload.status } : prev));
+  };
+
+  // callback sau khi đặt phòng xong -> cập nhật trạng thái bài
+  const handleBooked = (payload) => {
+    if (!payload) return;
+    setPost((prev) =>
+      prev ? { ...prev, status: payload.status || "booking" } : prev
+    );
+  };
+
+  const handleClickBooking = () => {
+    // chưa đăng nhập
+    if (!user) {
+      navigate("/dang-nhap-tai-khoan");
+      return;
+    }
+
+    // chỉ role 0 (người thuê) mới được đặt phòng
+    if (user.role !== 0) {
+      alert("Chỉ tài khoản Người thuê trọ mới có thể đặt phòng.");
+      return;
+    }
+
+    setBookingModalOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#f7f8fb]">
       <Header />
 
-      {/* Tabs (tự highlight theo router của bạn, giữ nguyên) */}
+      {/* Tabs */}
       <div className="max-w-[1150px] mx-auto px-3 md:px-6">
         <CategoryTabs />
       </div>
@@ -98,9 +210,21 @@ export default function PostDetail() {
 
           {/* Title + price + area + address + time */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-            <h1 className="text-2xl font-semibold text-[#e83e8c]">
-              {post.title}
-            </h1>
+            <div className="flex items-center gap-3">
+              {labelIcon && (
+                <img
+                  src={labelIcon}
+                  alt="Loại tin"
+                  className="w-9 h-9 object-contain"
+                />
+              )}
+              <h1
+                className="text-2xl font-semibold"
+                style={{ color: titleColor }}
+              >
+                {post.title}
+              </h1>
+            </div>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]">
               <span className="text-emerald-600 font-semibold">
@@ -108,23 +232,29 @@ export default function PostDetail() {
               </span>
               <span className="text-gray-600">{formatArea(post.area)}</span>
               <span className="text-gray-400">•</span>
-              <span className="text-gray-600">{timeAgo(post.createdAt)}</span>
+              <span className="text-gray-600">
+                {timeAgo(post.createdAt)}
+              </span>
             </div>
 
-            {/* Địa chỉ 2 dòng */}
-            <div className="mt-1 grid sm:grid-cols-2 gap-3 text-[15px]">
+            {/* Địa chỉ: địa chỉ nằm dưới tỉnh thành */}
+            <div className="mt-1 space-y-2 text-[15px]">
               <div className="flex items-start gap-2">
                 <span className="mt-0.5">🏙️</span>
                 <div>
                   <div className="text-gray-500">Tỉnh thành</div>
-                  <div className="text-gray-800">{post.province || "—"}</div>
+                  <div className="text-gray-800">
+                    {post.province || "—"}
+                  </div>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="mt-0.5">📍</span>
                 <div>
                   <div className="text-gray-500">Địa chỉ</div>
-                  <div className="text-gray-800">{post.address || "—"}</div>
+                  <div className="text-gray-800">
+                    {post.address || "—"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -133,7 +263,9 @@ export default function PostDetail() {
           {/* Mô tả */}
           {post.description && (
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
-              <h3 className="font-semibold text-lg mb-3">Thông tin mô tả</h3>
+              <h3 className="font-semibold text-lg mb-3">
+                Thông tin mô tả
+              </h3>
               <div className="whitespace-pre-line leading-7 text-gray-800">
                 {post.description}
               </div>
@@ -169,10 +301,13 @@ export default function PostDetail() {
                     src={mapSrc}
                     className="w-full h-full border-0"
                     loading="lazy"
+                    title="Bản đồ"
                   />
                 </div>
               ) : (
-                <div className="text-gray-500">Chưa có địa chỉ bản đồ.</div>
+                <div className="text-gray-500">
+                  Chưa có địa chỉ bản đồ.
+                </div>
               )}
 
               {/* Contact 2 (dưới map) */}
@@ -182,7 +317,9 @@ export default function PostDetail() {
                   <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100">
                     👤
                   </span>
-                  <span className="font-medium">{post.contactName || "—"}</span>
+                  <span className="font-medium">
+                    {post.contactName || "—"}
+                  </span>
                   {post.contactPhone && (
                     <>
                       <a
@@ -207,52 +344,139 @@ export default function PostDetail() {
           )}
         </section>
 
-        {/* RIGHT ASIDE - Contact chính + Đặt phòng */}
+        {/* RIGHT ASIDE */}
         <aside className="col-span-12 lg:col-span-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 sticky top-6 space-y-4">
-            <div className="flex flex-col items-center text-center gap-2">
-              <div className="w-20 h-20 rounded-full bg-gray-100 grid place-items-center text-2xl">
-                👤
+          {/* Người thuê trọ (role 0) / chưa đăng nhập */}
+          {!isLandlord ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sticky top-6 space-y-4">
+              <div className="flex flex-col items-center text-center gap-2">
+                <div className="w-20 h-20 rounded-full bg-gray-100 grid place-items-center text-2xl">
+                  👤
+                </div>
+                <div className="text-lg font-semibold">
+                  {post.contactName || "—"}
+                </div>
+                <div className="text-sm text-emerald-600">
+                  Đang hoạt động
+                </div>
               </div>
-              <div className="text-lg font-semibold">
-                {post.contactName || "—"}
-              </div>
-              <div className="text-sm text-emerald-600">
-                Đang hoạt động
-              </div>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              {post.contactPhone && (
+              <div className="flex flex-col gap-2">
+                {post.contactPhone && (
+                  <a
+                    href={`tel:${post.contactPhone}`}
+                    className="w-full grid place-items-center rounded-xl h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-medium"
+                  >
+                    {post.contactPhone}
+                  </a>
+                )}
+
                 <a
-                  href={`tel:${post.contactPhone}`}
-                  className="w-full grid place-items-center rounded-xl h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-medium"
+                  href={zalo}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full grid place-items-center rounded-xl h-11 bg-[#1a73e8] hover:opacity-90 text-white font-medium"
                 >
-                  {post.contactPhone}
+                  Nhắn Zalo
                 </a>
-              )}
-              <a
-                href={zalo}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full grid place-items-center rounded-xl h-11 bg-[#1a73e8] hover:opacity-90 text-white font-medium"
-              >
-                Nhắn Zalo
-              </a>
 
-              {/* Đặt phòng (stub) */}
-              <button
-                type="button"
-                className="w-full grid place-items-center rounded-xl h-11 border border-gray-300 hover:bg-gray-50 font-medium"
-                onClick={() => alert("Chức năng Đặt phòng sẽ được tích hợp sau.")}
-              >
-                Đặt phòng
-              </button>
+                <button
+                  type="button"
+                  className="w-full grid place-items-center rounded-xl h-11 border border-red-300 text-red-500 hover:bg-red-50 font-medium"
+                  onClick={() =>
+                    alert("Chức năng Báo xấu sẽ được tích hợp sau.")
+                  }
+                >
+                  Báo xấu
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full grid place-items-center rounded-xl h-11 bg-[#ff9800] hover:bg-[#fb8c00] text-white font-medium"
+                  onClick={handleClickBooking}
+                >
+                  Đặt phòng
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            // Người cho thuê (role 1): 4 chức năng quản lý tin
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 sticky top-6 space-y-4">
+              <div className="text-center mb-2">
+                <div className="text-sm text-gray-500">
+                  {post.contactName} — {post.contactPhone}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  className="w-full grid place-items-center rounded-xl h-11 bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                  onClick={() =>
+                    window.location.assign(
+                      `/quan-ly/tin-dang/sua-tin/${post.id}`
+                    )
+                  }
+                >
+                  Sửa tin
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full grid place-items-center rounded-xl h-11 border border-gray-300 hover:bg-gray-50 font-medium text-gray-800"
+                  onClick={() => setLabelModalOpen(true)}
+                >
+                  Gắn nhãn
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full grid place-items-center rounded-xl h-11 border border-gray-300 hover:bg-gray-50 font-medium text-gray-800"
+                  onClick={() => setExtendModalOpen(true)}
+                >
+                  Gia hạn
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full grid place-items-center rounded-xl h-11 border border-red-300 text-red-500 hover:bg-red-50 font-medium"
+                  onClick={() => setHideModalOpen(true)}
+                >
+                  Ẩn tin
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
       </main>
-        <Footer />
+
+      {/* 4 modal dùng chung */}
+      <LabelModal
+        open={labelModalOpen}
+        post={post}
+        onClose={() => setLabelModalOpen(false)}
+        onUpdated={handleLabelUpdated}
+      />
+      <ExtendModal
+        open={extendModalOpen}
+        post={post}
+        onClose={() => setExtendModalOpen(false)}
+        onUpdated={handleExtendUpdated}
+      />
+      <HidePostModal
+        open={hideModalOpen}
+        post={post}
+        onClose={() => setHideModalOpen(false)}
+        onUpdated={handleHideUpdated}
+      />
+      <BookingModal
+        open={bookingModalOpen}
+        post={post}
+        onClose={() => setBookingModalOpen(false)}
+        onBooked={handleBooked}
+      />
+
+      <Footer />
     </div>
   );
 }

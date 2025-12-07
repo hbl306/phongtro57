@@ -11,44 +11,26 @@ import PostDetail from "./containers/Public/PostDetail";
 import { useAuth } from "./containers/Public/AuthContext.jsx";
 import AdminHomeShell from "./containers/Admin/AdminHomeShell.jsx";
 import AdminPostManage from "./containers/Admin/AdminPostManage.jsx";
-
+import AdminBookingManage from "./containers/Admin/AdminBookingManage.jsx";
+import AdminUserManage from "./containers/Admin/AdminUserManage.jsx";
+import BookedRoomsForTenant from "./containers/System/BookedRoomsForTenant.jsx";
+import BookedRoomsForLandlord from "./containers/System/BookedRoomsForLandlord.jsx";
+import Recharge from "./containers/System/Recharge.jsx";
+import RechargeHistory from "./containers/System/RechargeHistory.jsx";
+import PaymentHistory from "./containers/System/PaymentHistory.jsx";
+import PriceTable from "./containers/System/PriceTable.jsx";
+import Profile from "./containers/System/Profile.jsx";
+import SavedPost from "./containers/Public/SavedPosts.jsx";
 /* ========= CÁC TRANG ĐƠN GIẢN (placeholder) ========= */
-
-function Recharge() {
-  return <div className="p-6">Nạp tiền vào tài khoản</div>;
-}
-
-function RechargeHistory() {
-  return <div className="p-6">Lịch sử nạp tiền</div>;
-}
-
-function PaymentHistory() {
-  return <div className="p-6">Lịch sử thanh toán</div>;
-}
-
-function PriceTable() {
-  return <div className="p-6">Bảng giá dịch vụ</div>;
-}
-
-function Profile() {
-  return <div className="p-6">Quản lý tài khoản</div>;
-}
 
 /**
  * Phòng được đặt cọc – dành cho ROLE 1 (người cho thuê)
  * Route: /quan-ly/phong-duoc-dat
  */
-function BookedRoomsForLandlord() {
-  return <div className="p-6">Phòng được đặt cọc (dành cho người cho thuê)</div>;
-}
-
 /**
  * Danh sách phòng đặt cọc – dành cho ROLE 0 (người thuê trọ)
  * Route: /quan-ly/phong-dat
  */
-function BookedRoomsForTenant() {
-  return <div className="p-6">Danh sách phòng đặt cọc (dành cho người thuê trọ)</div>;
-}
 
 /* ========= TỰ ĐỘNG CHUYỂN TRANG KHI VÀO /quan-ly ========= */
 /**
@@ -126,7 +108,7 @@ export default function App() {
   path="/admin/bookings"
   element={
     <AdminRoute>
-      <div className="p-6">Trang quản lý phòng đặt (TODO)</div>
+      <AdminBookingManage />
     </AdminRoute>
   }
 />
@@ -134,7 +116,7 @@ export default function App() {
   path="/admin/users"
   element={
     <AdminRoute>
-      <div className="p-6">Trang quản lý người dùng (TODO)</div>
+      <AdminUserManage />
     </AdminRoute>
   }
 />
@@ -165,6 +147,7 @@ export default function App() {
         <Route path="lich-su-thanh-toan" element={<PaymentHistory />} />
         <Route path="bang-gia" element={<PriceTable />} />
         <Route path="tai-khoan" element={<Profile />} />
+        <Route path="tin-da-luu" element={<SavedPost />} />
       </Route>
 
       {/* Trang chi tiết bài đăng + filter theo category / tỉnh */}

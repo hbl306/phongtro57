@@ -14,7 +14,9 @@ const ROLE_TEXT = {
 const formatVND = (n = 0) => `${Number(n || 0).toLocaleString("vi-VN")}đ`;
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  // ⬇ thêm refreshUser để làm mới số dư
+  const { user, logout, refreshUser } = useAuth();
+
   const [openUserBox, setOpenUserBox] = useState(false);
   const [openLocation, setOpenLocation] = useState(false);
   const [openFilter, setOpenFilter] = useState(false);
@@ -25,13 +27,13 @@ export default function Header() {
   const roleNumber = Number(user?.role);
   const roleLabel = ROLE_TEXT?.[roleNumber] || "Người dùng";
 
-  // Link "Quản lý" tuỳ theo role
+  // Link "Quản lý" tuỳ theo role (admin dùng fallback, không route admin nữa)
   const manageLink =
     roleNumber === 0
-      ? "/quan-ly/phong-dat" // Người thuê trọ -> danh sách phòng đặt cọc
+      ? "/quan-ly/phong-dat" // Người thuê trọ
       : roleNumber === 1
-      ? "/quan-ly/tin-dang" // Người cho thuê -> danh sách tin đăng
-      : "/quan-ly/tai-khoan"; // fallback
+      ? "/quan-ly/tin-dang" // Người cho thuê
+      : "/quan-ly/tai-khoan"; // mặc định
 
   useEffect(() => {
     const onDown = (e) => {
@@ -60,13 +62,29 @@ export default function Header() {
   const ward = sp.get("ward");
   const locationLabel = ward || district || provinceName || "Tìm theo khu vực";
 
+  // ⬇ Khi bấm logo về trang chủ: làm mới user (số dư) + đóng popup user
+  const handleClickHome = async () => {
+    setOpenUserBox(false);
+    if (user && typeof refreshUser === "function") {
+      try {
+        await refreshUser();
+      } catch (e) {
+        console.error("refreshUser error >>>", e);
+      }
+    }
+  };
+
   return (
     <>
       <header className="w-full bg-white sticky top-0 z-30 shadow-[0_1px_0_#eef]">
         {/* Hàng trên */}
         <div className="max-w-[1200px] mx-auto flex items-center gap-4 py-3 px-4">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
+          <Link
+            to="/"
+            onClick={handleClickHome}
+            className="flex items-center gap-2"
+          >
             <div className="text-[20px] font-bold text-[#0066cc] leading-none">
               PHONGTRO<span className="text-orange-500">57</span>.COM
             </div>
@@ -128,7 +146,7 @@ export default function Header() {
                 </Link>
               )}
 
-              {/* Ô Quản lý – link khác nhau tuỳ role */}
+              {/* Ô Quản lý – link khác nhau tuỳ role (không còn route admin riêng) */}
               <Link
                 to={manageLink}
                 className="px-3 py-1.5 rounded-full bg-[#fff3ec] text-[#ff5e2e] border border-[#ffd0b3] font-semibold hover:bg-[#ffe3d1]"
@@ -198,7 +216,7 @@ export default function Header() {
                     </div>
                   </div>
 
-                  {/* Menu theo role + icon */}
+                  {/* Menu theo role – BỎ hẳn nhánh admin, chỉ còn 0 & 1 */}
                   <div className="py-2">
                     {roleNumber === 0 && (
                       <>
@@ -211,7 +229,7 @@ export default function Header() {
                           <span>Quản lý phòng đặt</span>
                         </Link>
                         <Link
-                          to="/quan-ly/giao-dich"
+                          to="/quan-ly/nap-tien"
                           onClick={() => setOpenUserBox(false)}
                           className="block px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
                         >
@@ -240,7 +258,7 @@ export default function Header() {
                           <span>Quản lý tin đăng</span>
                         </Link>
                         <Link
-                          to="/quan-ly/giao-dich"
+                          to="/quan-ly/nap-tien"
                           onClick={() => setOpenUserBox(false)}
                           className="block px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
                         >
@@ -258,34 +276,7 @@ export default function Header() {
                       </>
                     )}
 
-                    {roleNumber === 2 && (
-                      <>
-                        <Link
-                          to="/admin/bookings"
-                          onClick={() => setOpenUserBox(false)}
-                          className="block px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <span className="text-lg">📅</span>
-                          <span>Quản lý Đặt phòng</span>
-                        </Link>
-                        <Link
-                          to="/admin/posts"
-                          onClick={() => setOpenUserBox(false)}
-                          className="block px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <span className="text-lg">📰</span>
-                          <span>Quản lý Bài viết</span>
-                        </Link>
-                        <Link
-                          to="/admin/users"
-                          onClick={() => setOpenUserBox(false)}
-                          className="block px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <span className="text-lg">👥</span>
-                          <span>Quản lý Người dùng</span>
-                        </Link>
-                      </>
-                    )}
+                    {/* Admin (role 2) không còn menu riêng ở đây, chỉ có nút Đăng xuất */}
 
                     <button
                       onClick={handleLogout}
@@ -298,8 +289,8 @@ export default function Header() {
                 </div>
               )}
 
-              {/* Nút Đăng tin chỉ cho role 1 & 2 */}
-              {(roleNumber === 1 || roleNumber === 2) && (
+              {/* Nút Đăng tin chỉ cho role 1 (chủ phòng) */}
+              {roleNumber === 1 && (
                 <button
                   onClick={gotoPost}
                   className="bg-[#ff5e2e] text-white px-5 py-2 rounded-full font-semibold"

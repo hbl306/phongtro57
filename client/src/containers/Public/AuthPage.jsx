@@ -49,7 +49,7 @@ export default function AuthPage() {
         </div>
       </main>
 
-      <Footer />
+      
     </div>
   );
 }

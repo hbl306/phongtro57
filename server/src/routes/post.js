@@ -53,13 +53,16 @@ router.patch('/:id/label', verifyToken, postCtrl.updateLabel);
 // ⏳ GIA HẠN THỜI GIAN HIỂN THỊ BÀI THEO ID
 router.patch('/:id/extend', verifyToken, postCtrl.extendPost);
 
-// 🔁 ĐĂNG LẠI BÀI THEO ID (GIỮ NGUYÊN ID, TÍNH LẠI PHÍ NHÃN)
+// 🔁 ĐĂNG LẠI BÀI THEO ID (GIỮ NGUYÊN ID, TÍNH LẠI PHÍ NHÃN + RESET createdAt)
 router.post('/:id/repost', verifyToken, postCtrl.repostPost);
+
+// 🛏️ ĐẶT PHÒNG (BOOKING) CHO BÀI THEO ID
+router.post('/:id/booking', verifyToken, postCtrl.bookPost);
 
 // ❌ ẨN BÀI THEO ID  (đúng path: /api/posts/:id/hide)
 router.patch('/:id/hide', verifyToken, postCtrl.hidePost);
 
-// =========== API Upload ==========
+// =========== API Upload (nếu bạn vẫn dùng chung router này) ==========
 router.post(
   '/upload/image',
   verifyToken,

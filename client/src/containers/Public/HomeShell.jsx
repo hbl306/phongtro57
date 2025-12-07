@@ -1,3 +1,4 @@
+// src/containers/Public/HomeShell.jsx
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import Header from "../../components/layout/Header";
@@ -75,7 +76,9 @@ export default function HomeShell() {
         if (!ignore) setLoading(false);
       }
     })();
-    return () => (ignore = true);
+    return () => {
+      ignore = true;
+    };
   }, [
     categoryCode,
     provinceSlug,
@@ -124,16 +127,31 @@ export default function HomeShell() {
     [visiblePosts]
   );
 
-  // carousel tin HOT (10s)
+  // carousel tin HOT (5s)
   const [hotIndex, setHotIndex] = useState(0);
   useEffect(() => {
     if (!hotPosts.length) return;
-    setHotIndex(0);
+
+    // nếu số lượng tin HOT thay đổi thì đảm bảo index không out of range
+    setHotIndex((prev) => (prev >= hotPosts.length ? 0 : prev));
+
     const timer = setInterval(() => {
       setHotIndex((prev) => (prev + 1) % hotPosts.length);
-    }, 10000);
+    }, 5000); // 5s
+
     return () => clearInterval(timer);
   }, [hotPosts.length]);
+
+  // chuyển tin HOT thủ công
+  const handleNextHot = () => {
+    if (!hotPosts.length) return;
+    setHotIndex((prev) => (prev + 1) % hotPosts.length);
+  };
+
+  const handlePrevHot = () => {
+    if (!hotPosts.length) return;
+    setHotIndex((prev) => (prev - 1 + hotPosts.length) % hotPosts.length);
+  };
 
   // sắp xếp tin còn lại: VIP1 -> VIP2 -> VIP3 -> không nhãn, trong từng nhóm: mới nhất trước
   const normalPosts = useMemo(() => {
@@ -191,17 +209,56 @@ export default function HomeShell() {
             <>
               {/* Khung tin HOT nổi bật */}
               {hotPosts.length > 0 && (
-                <div className="mb-5 rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 via-orange-50 to-yellow-50 shadow-sm">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-red-100">
+                <div className="mb-5 rounded-2xl border border-red-300 bg-gradient-to-r from-red-50 via-orange-50 to-yellow-50 shadow-md relative">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-red-100 bg-white/70 backdrop-blur">
                     <h2 className="text-red-600 font-semibold text-sm md:text-base uppercase tracking-wide">
-                      Tin HOT nổi bật
+                      🔥 Tin HOT nổi bật
                     </h2>
-                    <span className="text-xs text-red-500">
+                    <span className="text-xs text-red-500 font-medium">
                       {hotIndex + 1}/{hotPosts.length}
                     </span>
                   </div>
-                  <div className="p-3 md:p-4">
-                    <ListingCard post={hotPosts[hotIndex]} variant="hot" />
+                  <div className="p-3 md:p-4 relative">
+                    {/* KHÔNG truyền variant để giữ nguyên UI + icon tim */}
+                    <ListingCard post={hotPosts[hotIndex]} />
+
+                    {/* Nút chuyển trái/phải (desktop) */}
+                    {hotPosts.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handlePrevHot}
+                          className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleNextHot}
+                          className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
+                        >
+                          ›
+                        </button>
+
+                        {/* Mobile: nút dưới card */}
+                        <div className="flex sm:hidden justify-center gap-4 mt-3">
+                          <button
+                            type="button"
+                            onClick={handlePrevHot}
+                            className="px-3 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700 shadow-sm"
+                          >
+                            ‹ Trước
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextHot}
+                            className="px-3 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-700 shadow-sm"
+                          >
+                            Sau ›
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

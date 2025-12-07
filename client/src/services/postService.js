@@ -1,4 +1,4 @@
-// Base URL của API (lấy từ .env hoặc mặc định localhost:5000)
+// Base URL của API (lấy từ .env hoặc mặc định localhost:5000) 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 /* ----------------------------------------------
@@ -298,7 +298,6 @@ export async function extendPost(id, days) {
 
 /* ----------------------------------------------
  *  ĐĂNG LẠI BÀI ĐĂNG (GIỮ NGUYÊN ID)
- *  - POST /api/posts/:id/repost
  * ---------------------------------------------*/
 export async function repostPost(id, payload) {
   const res = await fetch(`${API_BASE}/api/posts/${id}/repost`, {
@@ -341,6 +340,36 @@ export async function hidePost(id) {
   const json = await res.json();
   if (!res.ok || !json?.success) {
     throw new Error(json?.message || 'Ẩn tin thất bại');
+  }
+
+  return json;
+}
+
+/* ----------------------------------------------
+ *  ĐẶT PHÒNG
+ *  - POST /api/posts/:id/booking
+ * ---------------------------------------------*/
+export async function bookPost(id) {
+  const res = await fetch(`${API_BASE}/api/posts/${id}/booking`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({}), // server tự tính tiền cọc
+  });
+
+  const json = await res.json();
+
+  if (!res.ok || !json?.success) {
+    const err = new Error(json?.message || 'Đặt phòng thất bại');
+    err.status = res.status;
+    if (json) {
+      err.code = json.code;
+      err.balance = json.balance;
+      err.needed = json.needed;
+    }
+    throw err;
   }
 
   return json;

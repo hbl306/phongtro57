@@ -68,7 +68,7 @@ export default function ManageSidebar() {
       {
         // route riêng cho ROLE 0
         to: "/quan-ly/phong-dat",
-        label: "Danh sách phòng đặt cọc",
+        label: "Phòng đang đặt cọc",
         icon: "📂",
       },
       ...commonMenu,

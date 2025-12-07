@@ -1,11 +1,18 @@
-import { createContext, useContext, useEffect, useState, useMemo } from "react";
+// src/containers/Public/AuthContext.jsx
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [authReady, setAuthReady] = useState(false); // ✅ thêm
+  const [authReady, setAuthReady] = useState(false);
 
   // Load lại khi F5
   useEffect(() => {
@@ -19,7 +26,7 @@ export function AuthProvider({ children }) {
         setUser(null);
       }
     }
-    setAuthReady(true); // ✅ báo là đã đọc xong localStorage
+    setAuthReady(true);
   }, []);
 
   const login = ({ token, user }) => {
@@ -36,7 +43,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("pt_user");
   };
 
-  // ⭐ Cho phép cập nhật cục bộ (vd: money sau khi trừ phí)
+  // Cập nhật cục bộ (vd: money sau khi trừ phí / nạp tiền)
   const updateUser = (partial) => {
     setUser((prev) => {
       const next =
@@ -48,12 +55,26 @@ export function AuthProvider({ children }) {
     });
   };
 
+  // ✅ refreshUser SAFE – chỉ đọc lại từ localStorage, không gọi API
+  const refreshUser = () => {
+    try {
+      const u = localStorage.getItem("pt_user");
+      if (!u) return;
+      const parsed = JSON.parse(u);
+      setUser(parsed);
+    } catch {
+      // ignore
+    }
+  };
+
   const value = useMemo(
-    () => ({ user, token, authReady, login, logout, updateUser }),
+    () => ({ user, token, authReady, login, logout, updateUser, refreshUser }),
     [user, token, authReady]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);

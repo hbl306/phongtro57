@@ -57,7 +57,8 @@ exports.getPost = async (req, res) => {
     const post = await postService.getPostById(req.params.id);
     return res.json({ success: true, data: post });
   } catch (err) {
-    return res.status(404).json({ success: false, message: err.message });
+    const status = err.status || 404;
+    return res.status(status).json({ success: false, message: err.message });
   }
 };
 
@@ -171,7 +172,7 @@ exports.updateLabel = async (req, res) => {
   }
 };
 
-/** ⏱️ GIA HẠN BÀI ĐĂNG (tăng số ngày star, trừ tiền) */
+/** ⏱️ GIA HẠN BÀI ĐĂNG */
 exports.extendPost = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -222,7 +223,7 @@ exports.extendPost = async (req, res) => {
   }
 };
 
-/** 🔁 ĐĂNG LẠI BÀI ĐĂNG (giữ nguyên id, tính lại phí nhãn) */
+/** 🔁 ĐĂNG LẠI BÀI ĐĂNG */
 exports.repostPost = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -241,7 +242,13 @@ exports.repostPost = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { id: post.id },
+      data: {
+        id: post.id,
+        status: post.status,
+        star: post.star,
+        createdAt: post.createdAt,
+        labelCode: post.labelCode,
+      },
       charged,
       balance,
       message: 'Đăng lại bài thành công',
@@ -286,6 +293,55 @@ exports.hidePost = async (req, res) => {
     });
   } catch (err) {
     console.log('hidePost error >>>', err);
+    const status = err.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: err.message || 'Internal server error',
+    });
+  }
+};
+
+/** 🛏️ ĐẶT PHÒNG (BOOKING) CHO MỘT BÀI ĐĂNG */
+exports.bookPost = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: 'Không xác định userId' });
+    }
+
+    const postId = req.params.id;
+    const result = await postService.bookPost(postId, userId);
+
+    const booking = result?.booking;
+    const post = result?.post;
+    const charged = result?.charged ?? 0;
+    const balance = result?.balance;
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        bookingId: booking.id,
+        postId: post.id,
+        postStatus: post.status,
+      },
+      charged,
+      balance,
+      message: 'Đặt phòng thành công',
+    });
+  } catch (err) {
+    if (err.code === 'INSUFFICIENT_BALANCE') {
+      return res.status(402).json({
+        success: false,
+        code: err.code,
+        message: 'Số dư tài khoản không đủ',
+        needed: err.needed,
+        balance: err.balance,
+      });
+    }
+
+    console.log('bookPost error >>>', err);
     const status = err.status || 500;
     return res.status(status).json({
       success: false,
