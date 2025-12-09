@@ -6,6 +6,9 @@ import { useState } from "react";
 import { validateRegister } from "../../utils/validation.js";
 import { useAuth } from "./AuthContext.jsx";
 
+// Lấy base URL cho API từ .env (VITE_API_URL) hoặc fallback về localhost khi dev
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function AuthPage() {
   const location = useLocation();
   const isRegister = location.pathname.includes("dang-ky");
@@ -31,7 +34,9 @@ export default function AuthPage() {
             <NavLink
               to="/dang-ky-tai-khoan"
               className={({ isActive }) =>
-                `py-5 border-b relative ${isActive ? "text-gray-900" : "text-gray-400"}`
+                `py-5 border-b relative ${
+                  isActive ? "text-gray-900" : "text-gray-400"
+                }`
               }
               end
             >
@@ -48,8 +53,6 @@ export default function AuthPage() {
           </div>
         </div>
       </main>
-
-      
     </div>
   );
 }
@@ -90,7 +93,7 @@ function LoginForm() {
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, password: pw }),
@@ -164,7 +167,7 @@ function RegisterForm() {
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/auth/register", {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // gửi role theo lựa chọn
@@ -175,7 +178,9 @@ function RegisterForm() {
       if (!res.ok) throw new Error(data.message || "Đăng ký thất bại");
 
       setSuccess("Đăng ký thành công! Đang chuyển sang đăng nhập…");
-      setName(""); setPhone(""); setPw("");
+      setName("");
+      setPhone("");
+      setPw("");
 
       setTimeout(() => navigate("/dang-nhap-tai-khoan"), 1200);
     } catch (err) {
@@ -212,8 +217,14 @@ function RegisterForm() {
         <div className="text-[15px] text-gray-700 mb-2">Loại tài khoản</div>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className={`border rounded-xl px-4 py-3 cursor-pointer transition
-                             ${role === 0 ? "border-orange-400 bg-orange-50" : "border-gray-200 hover:bg-gray-50"}`}>
+          <label
+            className={`border rounded-xl px-4 py-3 cursor-pointer transition
+                             ${
+                               role === 0
+                                 ? "border-orange-400 bg-orange-50"
+                                 : "border-gray-200 hover:bg-gray-50"
+                             }`}
+          >
             <div className="flex items-center gap-3">
               <input
                 type="radio"
@@ -229,8 +240,14 @@ function RegisterForm() {
             </div>
           </label>
 
-          <label className={`border rounded-xl px-4 py-3 cursor-pointer transition
-                             ${role === 1 ? "border-orange-400 bg-orange-50" : "border-gray-200 hover:bg-gray-50"}`}>
+          <label
+            className={`border rounded-xl px-4 py-3 cursor-pointer transition
+                             ${
+                               role === 1
+                                 ? "border-orange-400 bg-orange-50"
+                                 : "border-gray-200 hover:bg-gray-50"
+                             }`}
+          >
             <div className="flex items-center gap-3">
               <input
                 type="radio"
@@ -259,7 +276,8 @@ function RegisterForm() {
       </button>
 
       <p className="mt-4 text-xs text-gray-500 leading-5">
-        Qua việc đăng nhập hoặc tạo tài khoản, bạn đồng ý với các điều khoản sử dụng và chính sách bảo mật.
+        Qua việc đăng nhập hoặc tạo tài khoản, bạn đồng ý với các điều khoản
+        sử dụng và chính sách bảo mật.
       </p>
     </form>
   );

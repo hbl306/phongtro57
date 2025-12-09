@@ -19,6 +19,45 @@ import HidePostModal from "../../utils/HidePostModal.jsx";
 import BookingModal from "../../utils/BookingModal.jsx";
 import { useAuth } from "./AuthContext.jsx";
 
+// 👉 BASE API cho ảnh/video
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+  /\/+$/,
+  ""
+);
+
+function resolveMediaUrl(raw) {
+  if (!raw) return null;
+
+  // Nếu là full URL
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    try {
+      const u = new URL(raw);
+
+      // Trường hợp cũ: ảnh/video đang trỏ về localhost / 127.x
+      if (
+        (u.hostname === "localhost" || u.hostname.startsWith("127.")) &&
+        u.pathname.startsWith("/uploads/")
+      ) {
+        // Ép host sang API_BASE (devtunnel backend)
+        return `${API_BASE}${u.pathname}`;
+      }
+
+      // Các host khác giữ nguyên
+      return raw;
+    } catch {
+      return raw;
+    }
+  }
+
+  // Trường hợp chỉ lưu "/uploads/xxx"
+  if (raw.startsWith("/uploads/")) {
+    return `${API_BASE}${raw}`;
+  }
+
+  return raw;
+}
+
+
 function formatPrice(p) {
   if (p == null) return "—";
   const tr = p / 1_000_000;
@@ -108,6 +147,32 @@ export default function PostDetail() {
       }
     })();
   }, [id]);
+
+  // ✅ Chuẩn hoá images & videos (fix /uploads/... cho mọi máy)
+  const normalizedImages = useMemo(() => {
+    if (!post || !Array.isArray(post.images)) return post?.images;
+    return post.images.map((img) => {
+      if (typeof img === "string") {
+        return resolveMediaUrl(img);
+      }
+      const url = img?.url || img?.src;
+      const resolved = resolveMediaUrl(url);
+      // giữ nguyên các field khác nếu có
+      return { ...img, url: resolved };
+    });
+  }, [post]);
+
+  const normalizedVideos = useMemo(() => {
+    if (!post || !Array.isArray(post.videos)) return post?.videos;
+    return post.videos.map((v) => {
+      if (typeof v === "string") {
+        return resolveMediaUrl(v);
+      }
+      const url = v?.url || v?.src;
+      const resolved = resolveMediaUrl(url);
+      return { ...v, url: resolved, src: resolved || v.src };
+    });
+  }, [post]);
 
   const mapSrc = useMemo(() => {
     const q = encodeURIComponent(post?.address || "");
@@ -205,7 +270,7 @@ export default function PostDetail() {
         <section className="col-span-12 lg:col-span-8 space-y-5">
           {/* Media */}
           <div className="bg-white border border-gray-200 rounded-2xl p-4">
-            <MediaGallery images={post.images} videos={post.videos} />
+            <MediaGallery images={normalizedImages} videos={normalizedVideos} />
           </div>
 
           {/* Title + price + area + address + time */}
@@ -232,9 +297,7 @@ export default function PostDetail() {
               </span>
               <span className="text-gray-600">{formatArea(post.area)}</span>
               <span className="text-gray-400">•</span>
-              <span className="text-gray-600">
-                {timeAgo(post.createdAt)}
-              </span>
+              <span className="text-gray-600">{timeAgo(post.createdAt)}</span>
             </div>
 
             {/* Địa chỉ: địa chỉ nằm dưới tỉnh thành */}

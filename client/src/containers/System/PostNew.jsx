@@ -1,3 +1,4 @@
+// src/containers/System/PostNew.jsx (hoặc đường dẫn tương ứng)
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import VietnamAddress from "../../components/VietnamAddress.jsx";
 import Modal from "../../components/ui/Modal.jsx";
@@ -9,6 +10,9 @@ import {
   updatePost,
   repostPost,
 } from "../../services/postService.js";
+
+/* --------- API BASE (lấy từ .env hoặc fallback localhost) --------- */
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 /* --------- CONSTANTS --------- */
 const CATEGORY_OPTIONS = [
@@ -207,10 +211,11 @@ export default function PostNew() {
   const uploadFile = async (file, type = "image") => {
     const { token } = getAuth();
     if (!token) throw new Error("Không có token (pt_token). Đăng nhập lại.");
+
     const endpoint =
       type === "video"
-        ? "http://localhost:5000/api/upload/video"
-        : "http://localhost:5000/api/upload/image";
+        ? `${API_BASE}/api/upload/video`
+        : `${API_BASE}/api/upload/image`;
 
     const fd = new FormData();
     fd.append("file", file);
@@ -667,8 +672,8 @@ export default function PostNew() {
                 )}
                 {isEdit && (
                   <p className="mt-2 text-xs text-gray-500">
-                    Nhãn đã chọn sẽ được giữ nguyên khi chỉnh sửa, hệ thống không
-                    trừ tiền thêm.
+                    Nhãn đã chọn sẽ được giữ nguyên khi chỉnh sửa, hệ thống
+                    không trừ tiền thêm.
                   </p>
                 )}
               </div>
@@ -792,11 +797,7 @@ export default function PostNew() {
       >
         {successInfo && (
           <div className="space-y-2 text-[15px]">
-           
-            <p>
-              Thành công!
-            </p>
-           
+            <p>Thành công!</p>
           </div>
         )}
       </Modal>

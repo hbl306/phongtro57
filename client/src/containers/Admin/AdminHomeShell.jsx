@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import AdminHeader from "../../components/layout/AdminHeader.jsx";
 import { useAuth } from "../Public/AuthContext.jsx";
 
+// 👇 Base URL cho API (lấy từ .env, fallback localhost)
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 const DEFAULT_DASHBOARD = {
   pendingPosts: 0,
   bookingPending: 0,
@@ -64,7 +67,7 @@ export default function AdminHomeShell() {
     setLoading(true);
     setErr("");
     try {
-      const res = await fetch("http://localhost:5000/api/admin/dashboard", {
+      const res = await fetch(`${API_BASE}/api/admin/dashboard`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -463,7 +466,6 @@ export default function AdminHomeShell() {
                       +{dashboard.newUsersToday || 0}
                     </p>
                   </div>
-                  
                 </div>
               </div>
             </div>

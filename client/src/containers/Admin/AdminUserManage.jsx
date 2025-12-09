@@ -3,6 +3,12 @@ import { useEffect, useState } from "react";
 import AdminHeader from "../../components/layout/AdminHeader.jsx";
 import { useAuth } from "../Public/AuthContext.jsx";
 
+// 👇 Base URL cho API (env trước, localhost sau, bỏ dấu / ở cuối nếu có)
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+  /\/+$/,
+  ""
+);
+
 function EmptyState() {
   return (
     <div className="text-sm text-gray-500 text-center py-6">
@@ -33,7 +39,7 @@ export default function AdminUserManage() {
     setLoading(true);
     setErr("");
     try {
-      const url = new URL("http://localhost:5000/api/admin/users");
+      const url = new URL(`${API_BASE}/api/admin/users`);
       if (phone) url.searchParams.set("phone", phone);
       const res = await fetch(url.toString(), {
         headers: {
@@ -91,8 +97,8 @@ export default function AdminUserManage() {
 
       const isNew = !editUser.id;
       const url = isNew
-        ? "http://localhost:5000/api/admin/users"
-        : `http://localhost:5000/api/admin/users/${editUser.id}`;
+        ? `${API_BASE}/api/admin/users`
+        : `${API_BASE}/api/admin/users/${editUser.id}`;
       const method = isNew ? "POST" : "PUT";
 
       const res = await fetch(url, {
@@ -121,7 +127,7 @@ export default function AdminUserManage() {
   const doDelete = async () => {
     try {
       const res = await fetch(
-        `http://localhost:5000/api/admin/users/${deletingUser.id}`,
+        `${API_BASE}/api/admin/users/${deletingUser.id}`,
         {
           method: "DELETE",
           headers: {

@@ -10,6 +10,46 @@ import VIP1_ICON from "../../assets/VIP1.png";
 import VIP2_ICON from "../../assets/VIP2.png";
 import VIP3_ICON from "../../assets/VIP3.png";
 
+// 👉 BASE API (backend) – dùng để ghép với /uploads/...
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+  /\/+$/,
+  ""
+);
+
+// Chuẩn hoá URL ảnh/video
+function resolveMediaUrl(raw) {
+  if (!raw) return null;
+
+  // Nếu là full URL
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    try {
+      const u = new URL(raw);
+
+      // Trường hợp cũ: ảnh/video đang trỏ về localhost / 127.x
+      if (
+        (u.hostname === "localhost" || u.hostname.startsWith("127.")) &&
+        u.pathname.startsWith("/uploads/")
+      ) {
+        // Ép host sang API_BASE (devtunnel backend)
+        return `${API_BASE}${u.pathname}`;
+      }
+
+      // Các host khác giữ nguyên
+      return raw;
+    } catch {
+      return raw;
+    }
+  }
+
+  // Trường hợp chỉ lưu "/uploads/xxx"
+  if (raw.startsWith("/uploads/")) {
+    return `${API_BASE}${raw}`;
+  }
+
+  return raw;
+}
+
+
 /** 8_900_000 -> "8,9 triệu/tháng" */
 function formatPrice(p) {
   if (p == null) return "—";
@@ -90,12 +130,14 @@ export default function ListingCard({ post, variant = "default" }) {
 
   const saved = isSaved(post.id);
 
-
+  // ✅ Chuẩn hoá mảng ảnh: string / object đều convert sang URL đầy đủ
   const imgs = Array.isArray(post.images)
     ? post.images
-        .map((img) =>
-          typeof img === "string" ? img : img?.url
-        )
+        .map((img) => {
+          if (typeof img === "string") return resolveMediaUrl(img);
+          const url = img?.url || img?.src;
+          return resolveMediaUrl(url);
+        })
         .filter(Boolean)
     : [];
 
@@ -201,9 +243,7 @@ export default function ListingCard({ post, variant = "default" }) {
               <span className="text-emerald-600 font-semibold">
                 {formatPrice(post.price)}
               </span>
-              <span className="text-gray-500">
-                {formatArea(post.area)}
-              </span>
+              <span className="text-gray-500">{formatArea(post.area)}</span>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-gray-600">
