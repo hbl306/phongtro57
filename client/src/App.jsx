@@ -21,16 +21,7 @@ import PaymentHistory from "./containers/System/PaymentHistory.jsx";
 import PriceTable from "./containers/System/PriceTable.jsx";
 import Profile from "./containers/System/Profile.jsx";
 import SavedPost from "./containers/Public/SavedPosts.jsx";
-/* ========= CÁC TRANG ĐƠN GIẢN (placeholder) ========= */
-
-/**
- * Phòng được đặt cọc – dành cho ROLE 1 (người cho thuê)
- * Route: /quan-ly/phong-duoc-dat
- */
-/**
- * Danh sách phòng đặt cọc – dành cho ROLE 0 (người thuê trọ)
- * Route: /quan-ly/phong-dat
- */
+import AdminChat from "./containers/Admin/AdminChat.jsx";
 
 /* ========= TỰ ĐỘNG CHUYỂN TRANG KHI VÀO /quan-ly ========= */
 /**
@@ -120,6 +111,14 @@ export default function App() {
     </AdminRoute>
   }
 />
+<Route
+  path="/admin/chat"
+  element={
+    <AdminRoute>
+      <AdminChat />
+    </AdminRoute>
+  }
+/>
 
       {/* Public */}
       <Route path="/" element={<HomeShell />} />
@@ -135,7 +134,7 @@ export default function App() {
         <Route path="dang-tin-moi" element={<PostNew />} />
         <Route path="tin-dang" element={<PostList />} />
         <Route path="phong-duoc-dat" element={<BookedRoomsForLandlord />} />
-        {/* 🔥 Sửa tin: /quan-ly/tin-dang/sua-tin/:postId */}
+        {/*  Sửa tin: /quan-ly/tin-dang/sua-tin/:postId */}
         <Route path="tin-dang/sua-tin/:postId" element={<PostNew />} />
         <Route path="tin-dang/dang-lai/:postId" element={<PostNew />} />
         {/* Route dành cho người thuê trọ (ROLE 0) */}

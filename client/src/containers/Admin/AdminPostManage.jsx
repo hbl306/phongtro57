@@ -1,7 +1,11 @@
+// src/containers/Admin/AdminPostManage.jsx
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import AdminHeader from "../../components/layout/AdminHeader.jsx";
 import { useAuth } from "../Public/AuthContext.jsx";
+import AdminPageLayout from "./AdminPageLayout.jsx";
+
+// 👇 Base URL cho API (env trước, localhost sau)
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const TABS = [
   { key: "pending", label: "Bài đăng chưa duyệt" },
@@ -11,6 +15,7 @@ const TABS = [
 export default function AdminPostManage() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState("pending");
   const [pendingPosts, setPendingPosts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,7 +37,7 @@ export default function AdminPostManage() {
       setErr("");
 
       try {
-        const res = await fetch("http://localhost:5000/api/admin/posts", {
+        const res = await fetch(`${API_BASE}/api/admin/posts`, {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -40,9 +45,9 @@ export default function AdminPostManage() {
         });
 
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.message || "Không tải được danh sách bài đăng");
+        if (!res.ok)
+          throw new Error(data.message || "Không tải được danh sách bài đăng");
 
-        // Backend trả dạng: { success: true, data: [...] }
         setPendingPosts(Array.isArray(data.data) ? data.data : []);
       } catch (e) {
         setErr(e.message);
@@ -57,7 +62,7 @@ export default function AdminPostManage() {
   /* =================== DUYỆT BÀI =================== */
   const approvePost = async (postId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/posts/${postId}/approve`, {
+      const res = await fetch(`${API_BASE}/api/admin/posts/${postId}/approve`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -80,7 +85,7 @@ export default function AdminPostManage() {
     if (!ok) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/posts/${postId}`, {
+      const res = await fetch(`${API_BASE}/api/admin/posts/${postId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -103,7 +108,11 @@ export default function AdminPostManage() {
     if (err) return <p className="text-sm text-red-500">Lỗi: {err}</p>;
 
     if (!pendingPosts.length) {
-      return <p className="text-sm text-gray-500">Hiện không có bài đăng nào đang chờ duyệt.</p>;
+      return (
+        <p className="text-sm text-gray-500">
+          Hiện không có bài đăng nào đang chờ duyệt.
+        </p>
+      );
     }
 
     return (
@@ -115,26 +124,26 @@ export default function AdminPostManage() {
               key={id}
               className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3"
             >
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <Link
                   to={`/bai-dang/${id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-semibold text-blue-600 hover:underline"
+                  className="text-sm font-semibold text-blue-600 hover:underline line-clamp-1"
                 >
                   {post.title || "Không có tiêu đề"}
                 </Link>
+
                 <div className="mt-1 text-xs text-gray-500 space-x-2">
                   {post.address && <span>{post.address}</span>}
                   {post.price && (
-                    <span>
-                      • {Number(post.price).toLocaleString("vi-VN")}đ/tháng
-                    </span>
+                    <span>• {Number(post.price).toLocaleString("vi-VN")}đ/tháng</span>
                   )}
                   {post.createdAt && (
                     <span>• {new Date(post.createdAt).toLocaleString("vi-VN")}</span>
                   )}
                 </div>
+
                 {post.ownerName && (
                   <div className="mt-1 text-xs text-gray-500">
                     Người đăng: <b>{post.ownerName}</b>
@@ -163,19 +172,15 @@ export default function AdminPostManage() {
     );
   };
 
-  const renderReportedList = () => {
-    return (
-      <div className="text-sm text-gray-500">
-        Chức năng bài đăng báo xấu sẽ được phát triển sau.
-      </div>
-    );
-  };
+  const renderReportedList = () => (
+    <div className="text-sm text-gray-500">
+      Chức năng bài đăng báo xấu sẽ được phát triển sau.
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#f9efe4]">
-      <AdminHeader />
-
-      <main className="max-w-[1200px] mx-auto px-4 py-8">
+    <AdminPageLayout activeKey="posts">
+      <main className="max-w-[1200px] mx-auto px-0 py-2">
         <div className="mb-4">
           <h1 className="text-xl font-semibold text-gray-900">Quản lý bài đăng</h1>
           <p className="text-sm text-gray-600 mt-1">
@@ -183,7 +188,6 @@ export default function AdminPostManage() {
           </p>
         </div>
 
-        {/* Tabs */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="flex gap-4 border-b px-4">
             {TABS.map((tab) => (
@@ -208,6 +212,6 @@ export default function AdminPostManage() {
           </div>
         </div>
       </main>
-    </div>
+    </AdminPageLayout>
   );
 }

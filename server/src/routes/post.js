@@ -6,10 +6,13 @@ const multer = require("multer");
 
 const verifyToken = require("../middlewares/verifyToken");
 const postCtrl = require("../controllers/post");
+const commentCtrl = require("../controllers/comment"); // ✅ thêm controller cho comment
 
 const router = express.Router();
 
-// Helper tạo storage cho multer
+/* -------------------------------------------------
+ * Helper tạo storage cho multer
+ * ------------------------------------------------*/
 function makeStorage(subFolder) {
   const dir = path.join(process.cwd(), "public", "uploads", subFolder);
   fs.mkdirSync(dir, { recursive: true });
@@ -29,14 +32,16 @@ function makeStorage(subFolder) {
 const imageUpload = multer({ storage: makeStorage("images") });
 const videoUpload = multer({ storage: makeStorage("videos") });
 
-// Helper: lấy base URL đúng cho cả localhost & devtunnel
+/* -------------------------------------------------
+ * Helper: lấy base URL đúng cho cả localhost & devtunnel
+ * ------------------------------------------------*/
 function getBaseUrl(req) {
   const proto = req.headers["x-forwarded-proto"] || req.protocol;
   const host = req.headers["x-forwarded-host"] || req.get("host");
   return `${proto}://${host}`;
 }
 
-// =========== API Posts ===========
+/* =============== API Posts ================== */
 
 // sanity test
 router.get("/ping", (_, res) => res.json({ ok: 1 }));
@@ -49,6 +54,19 @@ router.get("/mine", verifyToken, postCtrl.getMyPosts);
 
 // Lấy chi tiết 1 bài
 router.get("/:id", postCtrl.getPost);
+
+/* ========= COMMENT CHO BÀI ĐĂNG =========
+ * GET  /api/posts/:id/comments        → lấy list comment của 1 bài
+ * POST /api/posts/:id/comments        → tạo comment mới (cần login)
+ * DELETE /api/posts/:postId/comments/:commentId → xoá comment
+ */
+router.get("/:id/comments", commentCtrl.getCommentsByPost);
+router.post("/:id/comments", verifyToken, commentCtrl.createComment);
+router.delete(
+  "/:postId/comments/:commentId",
+  verifyToken,
+  commentCtrl.deleteComment
+);
 
 // Tạo bài mới
 router.post("/", verifyToken, postCtrl.createPost);
@@ -71,7 +89,7 @@ router.post("/:id/booking", verifyToken, postCtrl.bookPost);
 // ❌ ẨN BÀI THEO ID  (đúng path: /api/posts/:id/hide)
 router.patch("/:id/hide", verifyToken, postCtrl.hidePost);
 
-// =========== API Upload (nếu FE vẫn dùng chung router này) ==========
+/* =============== API Upload (nếu FE vẫn dùng chung router này) =============== */
 
 // Upload ảnh: field name = "file"
 router.post(
@@ -89,7 +107,7 @@ router.post(
     return res.json({
       success: true,
       url: `${baseUrl}${relPath}`, // full URL truy cập từ máy nào cũng được
-      path: relPath,               // nếu FE muốn tự ghép với API_BASE
+      path: relPath, // nếu FE muốn tự ghép với API_BASE
       filename: req.file.filename,
     });
   }

@@ -1,20 +1,10 @@
 // src/containers/Admin/AdminUserManage.jsx
 import { useEffect, useState } from "react";
-import AdminHeader from "../../components/layout/AdminHeader.jsx";
 import { useAuth } from "../Public/AuthContext.jsx";
-
-// 👇 Base URL cho API (env trước, localhost sau, bỏ dấu / ở cuối nếu có)
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-  /\/+$/,
-  ""
-);
+import AdminPageLayout from "./AdminPageLayout.jsx";
 
 function EmptyState() {
-  return (
-    <div className="text-sm text-gray-500 text-center py-6">
-      Không tìm thấy tài khoản.
-    </div>
-  );
+  return <div className="text-sm text-gray-500">Không tìm thấy tài khoản.</div>;
 }
 
 export default function AdminUserManage() {
@@ -23,23 +13,22 @@ export default function AdminUserManage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-
   const [editUser, setEditUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
-
   const [deletingUser, setDeletingUser] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     fetchList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchList = async (phone) => {
     setLoading(true);
     setErr("");
     try {
-      const url = new URL(`${API_BASE}/api/admin/users`);
+      const url = new URL("http://localhost:5000/api/admin/users");
       if (phone) url.searchParams.set("phone", phone);
       const res = await fetch(url.toString(), {
         headers: {
@@ -63,13 +52,7 @@ export default function AdminUserManage() {
   };
 
   const openCreate = () => {
-    setEditUser({
-      name: "",
-      phone: "",
-      password: "",
-      role: 0,
-      money: 0,
-    });
+    setEditUser({ name: "", phone: "", password: "", role: 0, money: 0 });
     setShowModal(true);
   };
 
@@ -97,8 +80,8 @@ export default function AdminUserManage() {
 
       const isNew = !editUser.id;
       const url = isNew
-        ? `${API_BASE}/api/admin/users`
-        : `${API_BASE}/api/admin/users/${editUser.id}`;
+        ? "http://localhost:5000/api/admin/users"
+        : `http://localhost:5000/api/admin/users/${editUser.id}`;
       const method = isNew ? "POST" : "PUT";
 
       const res = await fetch(url, {
@@ -127,7 +110,7 @@ export default function AdminUserManage() {
   const doDelete = async () => {
     try {
       const res = await fetch(
-        `${API_BASE}/api/admin/users/${deletingUser.id}`,
+        `http://localhost:5000/api/admin/users/${deletingUser.id}`,
         {
           method: "DELETE",
           headers: {
@@ -147,14 +130,11 @@ export default function AdminUserManage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6eee6]">
-      <AdminHeader />
-
-      <main className="max-w-[1200px] mx-auto px-4 py-8">
-        {/* Header */}
+    <AdminPageLayout activeKey="users">
+      <main className="py-2">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold text-gray-900">
               Quản lý Người dùng
             </h1>
             <p className="text-sm text-gray-600 mt-1">
@@ -168,55 +148,63 @@ export default function AdminUserManage() {
                 value={qPhone}
                 onChange={(e) => setQPhone(e.target.value)}
                 placeholder="Tìm theo số điện thoại"
-                className="px-4 py-2 rounded-lg border border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-orange-300 outline-none"
+                className="px-3 py-2 rounded-full border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e2e]/40"
               />
-              <button className="px-4 py-2 bg-[#ff6a3d] text-white rounded-lg shadow-sm hover:bg-[#ff5526] transition">
+              <button
+                className="px-4 py-2 bg-[#ff5e2e] text-white rounded-full text-sm shadow-sm hover:bg-[#ff4a1a] transition"
+                type="submit"
+              >
                 Tìm
               </button>
             </form>
-
             <button
               onClick={openCreate}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg shadow-sm hover:bg-green-600 transition"
+              className="px-4 py-2 bg-green-500 text-white rounded-full text-sm shadow-sm hover:bg-green-600 transition"
             >
               Thêm tài khoản
             </button>
           </div>
         </div>
 
-        {/* List */}
-        <div className="bg-white rounded-xl p-5 shadow-sm">
-          {loading && <div className="text-sm text-gray-500">Đang tải...</div>}
-          {err && <div className="text-sm text-red-500">{err}</div>}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-orange-100/60">
+          {loading && (
+            <div className="text-sm text-gray-500">Đang tải danh sách...</div>
+          )}
+          {err && <div className="text-sm text-red-500 mb-2">{err}</div>}
           {!loading && users.length === 0 && <EmptyState />}
 
           {users.length > 0 && (
-            <div className="space-y-3">
-              {users.map((u) => (
+            <div className="space-y-2">
+              {users.map((u, idx) => (
                 <div
                   key={u.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition shadow-sm"
+                  className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-white to-[#fff7f2] hover:shadow-sm transition"
                 >
-                  <div>
-                    <div className="font-semibold text-gray-800 text-lg">
-                      {u.name || "—"}
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#ffede1] flex items-center justify-center text-xs font-semibold text-[#ff5e2e]">
+                      {idx + 1}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {u.phone} • Vai trò: {u.role} • Số dư:{" "}
-                      {Number(u.money).toLocaleString()}đ
+                    <div>
+                      <div className="font-semibold text-gray-900">
+                        {u.name || "—"}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {u.phone} • Vai trò: {u.role} • Số dư:{" "}
+                        {Number(u.money).toLocaleString("vi-VN")}đ
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     <button
                       onClick={() => openEdit(u)}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow-sm hover:bg-blue-600 transition"
+                      className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded-full hover:bg-blue-600 transition"
                     >
                       Sửa
                     </button>
                     <button
                       onClick={() => confirmDelete(u)}
-                      className="px-4 py-2 bg-red-500 text-white rounded-lg shadow-sm hover:bg-red-600 transition"
+                      className="px-3 py-1.5 bg-red-500 text-white text-xs rounded-full hover:bg-red-600 transition"
                     >
                       Xóa
                     </button>
@@ -232,15 +220,15 @@ export default function AdminUserManage() {
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/30"
             onClick={() => setShowModal(false)}
           />
-          <div className="bg-white rounded-2xl w-[520px] p-6 z-10 shadow-xl animate-fadeIn">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800">
+          <div className="bg-white rounded-2xl w-[520px] p-6 z-10 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">
               {editUser?.id ? "Chỉnh sửa tài khoản" : "Thêm tài khoản"}
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-600">Số điện thoại</label>
                 <input
@@ -248,7 +236,7 @@ export default function AdminUserManage() {
                   onChange={(e) =>
                     setEditUser({ ...editUser, phone: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-300 outline-none"
+                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e2e]/40"
                 />
               </div>
 
@@ -259,14 +247,14 @@ export default function AdminUserManage() {
                   onChange={(e) =>
                     setEditUser({ ...editUser, name: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-300 outline-none"
+                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e2e]/40"
                 />
               </div>
 
               <div>
                 <label className="text-xs text-gray-600">
                   Mật khẩu{" "}
-                  <span className="text-gray-400">
+                  <span className="text-xs text-gray-400">
                     ({editUser.id ? "để trống không đổi" : "bắt buộc"})
                   </span>
                 </label>
@@ -276,7 +264,7 @@ export default function AdminUserManage() {
                     setEditUser({ ...editUser, password: e.target.value })
                   }
                   type="password"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-300 outline-none"
+                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e2e]/40"
                 />
               </div>
 
@@ -290,7 +278,7 @@ export default function AdminUserManage() {
                       role: Number(e.target.value),
                     })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-300 outline-none"
+                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e2e]/40"
                 >
                   <option value={0}>Người thuê trọ (0)</option>
                   <option value={1}>Người cho thuê (1)</option>
@@ -305,21 +293,21 @@ export default function AdminUserManage() {
                   onChange={(e) =>
                     setEditUser({ ...editUser, money: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-blue-300 outline-none"
+                  className="w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5e2e]/40"
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-5 flex justify-end gap-2">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-lg border shadow-sm hover:bg-gray-100 transition"
+                className="px-4 py-2 border rounded-full text-sm"
               >
                 Hủy
               </button>
               <button
                 onClick={saveUser}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow-sm hover:bg-blue-700 transition"
+                className="px-4 py-2 bg-blue-600 text-white rounded-full text-sm hover:bg-blue-700 transition"
               >
                 {editUser.id ? "Lưu" : "Tạo"}
               </button>
@@ -332,27 +320,25 @@ export default function AdminUserManage() {
       {confirmOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-40">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/30"
             onClick={() => setConfirmOpen(false)}
           />
-          <div className="bg-white rounded-2xl p-6 w-[420px] shadow-xl z-50">
-            <h3 className="text-lg font-semibold mb-3 text-gray-800">
-              Xác nhận xóa
-            </h3>
-            <p className="text-gray-700">
+          <div className="bg-white rounded-2xl p-6 z-50 w-[420px] shadow-xl">
+            <h3 className="font-semibold mb-3">Xác nhận xóa</h3>
+            <p>
               Bạn có chắc chắn muốn xoá tài khoản{" "}
               <strong>{deletingUser?.phone}</strong> ?
             </p>
-            <div className="mt-4 flex justify-end gap-3">
+            <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setConfirmOpen(false)}
-                className="px-4 py-2 rounded-lg border shadow-sm hover:bg-gray-100 transition"
+                className="px-4 py-2 border rounded-full text-sm"
               >
                 Hủy
               </button>
               <button
                 onClick={doDelete}
-                className="px-4 py-2 rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 transition"
+                className="px-4 py-2 bg-red-600 text-white rounded-full text-sm hover:bg-red-700 transition"
               >
                 Xóa
               </button>
@@ -360,6 +346,6 @@ export default function AdminUserManage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminPageLayout>
   );
 }

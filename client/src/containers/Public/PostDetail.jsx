@@ -17,13 +17,19 @@ import LabelModal from "../../utils/LabelModal.jsx";
 import ExtendModal from "../../utils/ExtendModal.jsx";
 import HidePostModal from "../../utils/HidePostModal.jsx";
 import BookingModal from "../../utils/BookingModal.jsx";
+import ReportModal from "../../utils/ReportModal.jsx";
 import { useAuth } from "./AuthContext.jsx";
 
+// 🔥 service bình luận
+import {
+  listComments,
+  createComment,
+} from "../../services/commentService.js";
+
 // 👉 BASE API cho ảnh/video
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-  /\/+$/,
-  ""
-);
+const API_BASE = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000"
+).replace(/\/+$/, "");
 
 function resolveMediaUrl(raw) {
   if (!raw) return null;
@@ -56,7 +62,6 @@ function resolveMediaUrl(raw) {
 
   return raw;
 }
-
 
 function formatPrice(p) {
   if (p == null) return "—";
@@ -128,12 +133,20 @@ export default function PostDetail() {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // state mở 4 modal
+  // state mở 5 modal
   const [labelModalOpen, setLabelModalOpen] = useState(false);
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [hideModalOpen, setHideModalOpen] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
+  // 🔥 state bình luận
+  const [comments, setComments] = useState([]);
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentContent, setCommentContent] = useState("");
+
+  // load post
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -147,6 +160,70 @@ export default function PostDetail() {
       }
     })();
   }, [id]);
+
+  // load comments
+  useEffect(() => {
+    if (!id) return;
+    let ignore = false;
+
+    (async () => {
+      setCommentLoading(true);
+      try {
+        const data = await listComments(id);
+        if (!ignore) setComments(data);
+      } catch (err) {
+        console.error("Lỗi tải bình luận:", err);
+        if (!ignore) setComments([]);
+      } finally {
+        if (!ignore) setCommentLoading(false);
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, [id]);
+
+  // gửi bình luận — chỉ cho người thuê (role = 0)
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
+
+    if (!user || user.role !== 0) {
+      alert("Chỉ tài khoản Người thuê trọ mới có thể bình luận.");
+      return;
+    }
+
+    if (!commentContent.trim()) {
+      alert("Vui lòng nhập nội dung bình luận.");
+      return;
+    }
+
+    if (!user.name) {
+      alert(
+        "Vui lòng cập nhật họ tên trong hồ sơ tài khoản trước khi bình luận."
+      );
+      return;
+    }
+
+    try {
+      setCommentSubmitting(true);
+
+      const newComment = await createComment(id, {
+        content: commentContent.trim(),
+        name: user.name,
+        userId: user.id,
+      });
+
+      // thêm bình luận mới lên đầu
+      setComments((prev) => [newComment, ...prev]);
+      setCommentContent("");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Gửi bình luận thất bại");
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
 
   // ✅ Chuẩn hoá images & videos (fix /uploads/... cho mọi máy)
   const normalizedImages = useMemo(() => {
@@ -204,6 +281,7 @@ export default function PostDetail() {
   const zalo = `https://zalo.me/${CleanPhone(post.contactPhone)}`;
   const { color: titleColor, icon: labelIcon } = getLabelInfo(post);
   const isLandlord = user?.role === 1;
+  const canComment = user && user.role === 0;
 
   // callback sau khi modal gắn nhãn / gia hạn / ẩn tin
   const handleLabelUpdated = (payload) => {
@@ -326,9 +404,7 @@ export default function PostDetail() {
           {/* Mô tả */}
           {post.description && (
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
-              <h3 className="font-semibold text-lg mb-3">
-                Thông tin mô tả
-              </h3>
+              <h3 className="font-semibold text-lg mb-3">Thông tin mô tả</h3>
               <div className="whitespace-pre-line leading-7 text-gray-800">
                 {post.description}
               </div>
@@ -368,9 +444,7 @@ export default function PostDetail() {
                   />
                 </div>
               ) : (
-                <div className="text-gray-500">
-                  Chưa có địa chỉ bản đồ.
-                </div>
+                <div className="text-gray-500">Chưa có địa chỉ bản đồ.</div>
               )}
 
               {/* Contact 2 (dưới map) */}
@@ -409,61 +483,171 @@ export default function PostDetail() {
 
         {/* RIGHT ASIDE */}
         <aside className="col-span-12 lg:col-span-4">
-          {/* Người thuê trọ (role 0) / chưa đăng nhập */}
+          {/* Người thuê trọ (role 0) / khách */}
           {!isLandlord ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 sticky top-6 space-y-4">
-              <div className="flex flex-col items-center text-center gap-2">
-                <div className="w-20 h-20 rounded-full bg-gray-100 grid place-items-center text-2xl">
-                  👤
+            <div className="space-y-4 sticky top-6">
+              {/* Khung chức năng — phiên bản thu gọn */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-14 h-14 rounded-full bg-gray-100 grid place-items-center text-xl">
+                    👤
+                  </div>
+                  <div className="text-base font-semibold">
+                    {post.contactName || "—"}
+                  </div>
+                  
                 </div>
-                <div className="text-lg font-semibold">
-                  {post.contactName || "—"}
-                </div>
-                <div className="text-sm text-emerald-600">
-                  Đang hoạt động
+
+                <div className="flex flex-col gap-2 text-sm">
+                  {post.contactPhone && (
+                    <a
+                      href={`tel:${post.contactPhone}`}
+                      className="w-full grid place-items-center rounded-xl h-10 bg-emerald-500 hover:bg-emerald-600 text-white font-medium"
+                    >
+                      {post.contactPhone}
+                    </a>
+                  )}
+
+                  <a
+                    href={zalo}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full grid place-items-center rounded-xl h-10 bg-[#1a73e8] hover:opacity-90 text-white font-medium"
+                  >
+                    Nhắn Zalo
+                  </a>
+
+                  <button
+                    type="button"
+                    className="w-full grid place-items-center rounded-xl h-10 border border-red-300 text-red-500 hover:bg-red-50 font-medium"
+                    onClick={() => setReportModalOpen(true)}
+                  >
+                    Báo xấu
+                  </button>
+
+                  <button
+                    type="button"
+                    className="w-full grid place-items-center rounded-xl h-10 bg-[#ff9800] hover:bg-[#fb8c00] text-white font-medium"
+                    onClick={handleClickBooking}
+                  >
+                    Đặt phòng
+                  </button>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                {post.contactPhone && (
-                  <a
-                    href={`tel:${post.contactPhone}`}
-                    className="w-full grid place-items-center rounded-xl h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-medium"
+              {/* Khung bình luận — chỉ phía người thuê / khách */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 text-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-[15px]">Bình luận</h3>
+                  {comments.length > 0 && (
+                    <span className="text-xs text-gray-500">
+                      {comments.length} bình luận
+                    </span>
+                  )}
+                </div>
+
+                {/* Form bình luận */}
+                {canComment ? (
+                  <form
+                    onSubmit={handleSubmitComment}
+                    className="space-y-2 mb-3"
                   >
-                    {post.contactPhone}
-                  </a>
+                    <div className="text-xs text-gray-500">
+                      Bình luận dưới tên{" "}
+                      <span className="font-medium text-gray-800">
+                        {user.name || "(Chưa có tên)"}
+                      </span>
+                      .
+                    </div>
+
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100 resize-none"
+                      placeholder="Viết bình luận của bạn..."
+                      value={commentContent}
+                      onChange={(e) => setCommentContent(e.target.value)}
+                    />
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-gray-400">
+                        Không chia sẻ thông tin nhạy cảm.
+                      </span>
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium disabled:opacity-60"
+                        disabled={commentSubmitting}
+                      >
+                        {commentSubmitting ? "Đang gửi..." : "Gửi bình luận"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="mb-3 text-xs text-gray-500 space-y-1">
+                    <p>
+                      Đăng nhập bằng tài khoản{" "}
+                      <b className="text-gray-800">Người thuê trọ</b> để viết
+                      bình luận.
+                    </p>
+                    {!user && (
+                      <button
+                        type="button"
+                        onClick={() => navigate("/dang-nhap-tai-khoan")}
+                        className="mt-1 inline-flex items-center px-3 py-1.5 rounded-full border border-orange-200 text-orange-600 hover:bg-orange-50 text-[11px] font-medium"
+                      >
+                        Đăng nhập
+                      </button>
+                    )}
+                  </div>
                 )}
 
-                <a
-                  href={zalo}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full grid place-items-center rounded-xl h-11 bg-[#1a73e8] hover:opacity-90 text-white font-medium"
-                >
-                  Nhắn Zalo
-                </a>
+                {/* Danh sách bình luận */}
+                {commentLoading && comments.length === 0 && (
+                  <p className="text-xs text-gray-400">
+                    Đang tải bình luận...
+                  </p>
+                )}
 
-                <button
-                  type="button"
-                  className="w-full grid place-items-center rounded-xl h-11 border border-red-300 text-red-500 hover:bg-red-50 font-medium"
-                  onClick={() =>
-                    alert("Chức năng Báo xấu sẽ được tích hợp sau.")
-                  }
-                >
-                  Báo xấu
-                </button>
+                {!commentLoading && comments.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    Chưa có bình luận nào. Hãy là người đầu tiên!
+                  </p>
+                )}
 
-                <button
-                  type="button"
-                  className="w-full grid place-items-center rounded-xl h-11 bg-[#ff9800] hover:bg-[#fb8c00] text-white font-medium"
-                  onClick={handleClickBooking}
-                >
-                  Đặt phòng
-                </button>
+                {comments.length > 0 && (
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                    {comments.map((c) => {
+                      const displayName =
+                        c.userName ||
+                        c.user_name ||
+                        c.name ||
+                        (c.user && c.user.name) ||
+                        "Ẩn danh";
+
+                      return (
+                        <div
+                          key={c.id}
+                          className="border-t border-gray-100 pt-2 first:border-t-0 first:pt-0"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-gray-800">
+                              {displayName}
+                            </span>
+                            <span className="text-[11px] text-gray-400">
+                              {timeAgo(c.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[13px] text-gray-700 whitespace-pre-line">
+                            {c.content}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
-            // Người cho thuê (role 1): 4 chức năng quản lý tin
+            // Người cho thuê (role 1): 4 chức năng quản lý tin — GIỮ NGUYÊN
             <div className="bg-white border border-gray-200 rounded-2xl p-5 sticky top-6 space-y-4">
               <div className="text-center mb-2">
                 <div className="text-sm text-gray-500">
@@ -513,7 +697,7 @@ export default function PostDetail() {
         </aside>
       </main>
 
-      {/* 4 modal dùng chung */}
+      {/* 5 modal dùng chung */}
       <LabelModal
         open={labelModalOpen}
         post={post}
@@ -537,6 +721,12 @@ export default function PostDetail() {
         post={post}
         onClose={() => setBookingModalOpen(false)}
         onBooked={handleBooked}
+      />
+      <ReportModal
+        open={reportModalOpen}
+        post={post}
+        currentUser={user}
+        onClose={() => setReportModalOpen(false)}
       />
 
       <Footer />

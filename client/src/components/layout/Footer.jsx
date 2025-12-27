@@ -126,7 +126,7 @@ export default function Footer() {
             © {new Date().getFullYear()} <span className="font-semibold">phongtro57</span> — Người thuê là người khôn.
           </p>
           <p className="text-[11px] text-gray-400">
-            Made with by Team Tồ Tề hẹ hẹ hẹ...
+            Made by Team Tồ Tề hẹ hẹ hẹ...
           </p>
         </div>
       </div>

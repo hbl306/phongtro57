@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+// src/containers/Admin/AdminBookingManage.jsx
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AdminHeader from "../../components/layout/AdminHeader.jsx";
 import { useAuth } from "../Public/AuthContext.jsx";
 import bookingService from "../../services/bookingService";
+import AdminPageLayout from "./AdminPageLayout.jsx";
 
 const TABS = [
   { key: "deposit", label: "Phòng đang được đặt cọc" },
   { key: "confirmed", label: "Phòng đã được xác nhận" },
 ];
 
-const formatVND = (n = 0) =>
-  (Number(n) || 0).toLocaleString("vi-VN") + "đ";
+const formatVND = (n = 0) => (Number(n) || 0).toLocaleString("vi-VN") + "đ";
 
 const formatDateTime = (value) => {
   if (!value) return "—";
@@ -27,7 +27,7 @@ export default function AdminBookingManage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [searchPhone, setSearchPhone] = useState(""); // <-- ô tìm theo SĐT
+  const [searchPhone, setSearchPhone] = useState("");
 
   // Nếu không phải admin thì quay về /
   useEffect(() => {
@@ -46,10 +46,7 @@ export default function AdminBookingManage() {
         setErr("");
 
         const data = await bookingService.adminGetAllBookings();
-
-        if (!ignore) {
-          setBookings(Array.isArray(data) ? data : []);
-        }
+        if (!ignore) setBookings(Array.isArray(data) ? data : []);
       } catch (e) {
         if (!ignore) {
           console.error("fetch admin bookings error >>>", e);
@@ -77,15 +74,9 @@ export default function AdminBookingManage() {
       const postStatus = b?.post?.status || b.postStatus || "";
       const bookingStatus = b?.status || "";
 
-      if (postStatus === "booking" && bookingStatus === "pending") {
-        deposit.push(b);
-      }
-      if (postStatus === "booked" && bookingStatus === "confirmed") {
-        confirmed.push(b);
-      }
-      if (postStatus === "booked" && bookingStatus === "paid") {
-        paid.push(b);
-      }
+      if (postStatus === "booking" && bookingStatus === "pending") deposit.push(b);
+      if (postStatus === "booked" && bookingStatus === "confirmed") confirmed.push(b);
+      if (postStatus === "booked" && bookingStatus === "paid") paid.push(b);
     });
 
     return {
@@ -136,16 +127,23 @@ export default function AdminBookingManage() {
     return <span className={cls}>{text}</span>;
   };
 
+  const getThumbUrl = (post) => {
+    const imgs = post?.images;
+    if (!Array.isArray(imgs) || imgs.length === 0) return null;
+
+    const first = imgs[0];
+    // hỗ trợ cả dạng: { url } và dạng: "filename.jpg" / "http..."
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object") return first.url || first.path || null;
+    return null;
+  };
+
   const renderBookingItem = (booking, { showSendDeposit } = {}) => {
     const post = booking.post || {};
     const tenant = booking.tenant || {};
-    const thumb =
-      Array.isArray(post.images) && post.images.length
-        ? post.images[0].url
-        : null;
+    const thumb = getThumbUrl(post);
 
-    const canSendDeposit =
-      showSendDeposit && booking.status === "confirmed";
+    const canSendDeposit = showSendDeposit && booking.status === "confirmed";
 
     return (
       <div
@@ -167,7 +165,7 @@ export default function AdminBookingManage() {
           )}
         </div>
 
-        {/* Nội dung + 3 cụm thông tin */}
+        {/* Nội dung */}
         <div className="flex-1 min-w-0">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -175,12 +173,14 @@ export default function AdminBookingManage() {
                 {post.title || `Tin #${post.id}`}
               </h3>
             </div>
+
             <p className="mt-1 text-xs text-gray-500 line-clamp-1">
               {post.address ||
                 [post.street, post.ward, post.district, post.province]
                   .filter(Boolean)
                   .join(", ")}
             </p>
+
             {tenant?.name && (
               <p className="mt-1 text-xs text-gray-500">
                 Người thuê: <b>{tenant.name}</b>
@@ -189,7 +189,7 @@ export default function AdminBookingManage() {
             )}
           </div>
 
-          {/* 3 block info – sát nhau hơn */}
+          {/* info */}
           <div className="mt-1 grid grid-cols-3 gap-x-6 gap-y-1 text-xs">
             <div>
               <div className="text-gray-500">Giá phòng</div>
@@ -197,26 +197,28 @@ export default function AdminBookingManage() {
                 {post.price ? formatVND(post.price) : "—"}
               </div>
             </div>
+
             <div>
               <div className="text-gray-500">Tiền cọc</div>
               <div className="font-semibold text-orange-600">
-                {booking.depositAmount
-                  ? formatVND(booking.depositAmount)
-                  : "—"}
+                {booking.depositAmount ? formatVND(booking.depositAmount) : "—"}
               </div>
             </div>
+
             <div>
               <div className="text-gray-500">Thời gian đặt</div>
               <div className="font-medium text-gray-800">
                 {formatDateTime(booking.createdAt)}
               </div>
             </div>
+
             <div>
               <div className="text-gray-500">Hết hạn giữ chỗ</div>
               <div className="font-medium text-gray-800">
                 {formatDateTime(booking.expiresAt)}
               </div>
             </div>
+
             <div>
               <div className="text-gray-500">Thời gian xác nhận</div>
               <div className="font-medium text-gray-800">
@@ -228,12 +230,10 @@ export default function AdminBookingManage() {
 
         {/* Cột phải */}
         {!showSendDeposit ? (
-          // Tab "Phòng đang được đặt cọc" – chỉ có trạng thái, căn giữa
           <div className="flex items-center flex-shrink-0 pl-6">
             {renderStatusBadge(booking)}
           </div>
         ) : (
-          // Tab "Phòng đã được xác nhận" – trạng thái bên trái, nút bên phải
           <div className="flex items-center flex-shrink-0 gap-6 pl-6">
             <div>{renderStatusBadge(booking)}</div>
 
@@ -258,48 +258,24 @@ export default function AdminBookingManage() {
 
   const renderList = (list, emptyText, options = {}) => {
     if (loading)
-      return (
-        <p className="text-sm text-gray-500 py-4">
-          Đang tải danh sách phòng đặt…
-        </p>
-      );
-    if (err)
-      return (
-        <p className="text-sm text-red-500 py-4">
-          Lỗi: {err}
-        </p>
-      );
-    if (!list.length)
-      return (
-        <p className="text-sm text-gray-500 py-4">
-          {emptyText}
-        </p>
-      );
+      return <p className="text-sm text-gray-500 py-4">Đang tải danh sách phòng đặt…</p>;
+    if (err) return <p className="text-sm text-red-500 py-4">Lỗi: {err}</p>;
+    if (!list.length) return <p className="text-sm text-gray-500 py-4">{emptyText}</p>;
 
-    return (
-      <div className="space-y-3">
-        {list.map((b) => renderBookingItem(b, options))}
-      </div>
-    );
+    return <div className="space-y-3">{list.map((b) => renderBookingItem(b, options))}</div>;
   };
 
   return (
-    <div className="min-h-screen bg-[#f9efe4]">
-      <AdminHeader />
-
-      <main className="max-w-[1200px] mx-auto px-4 py-8">
+    <AdminPageLayout activeKey="bookings">
+      <main className="max-w-[1200px] mx-auto px-0 py-2">
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">
-            Quản lý phòng đặt
-          </h1>
+          <h1 className="text-xl font-semibold text-gray-900">Quản lý phòng đặt</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Theo dõi các phòng đang được đặt cọc và đã xác nhận, xử lý việc
-            chuyển tiền cọc cho chủ phòng.
+            Theo dõi các phòng đang được đặt cọc và đã xác nhận.
           </p>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-          {/* Tabs */}
           <div className="flex gap-4 border-b px-4">
             {TABS.map((tab) => (
               <button
@@ -319,14 +295,10 @@ export default function AdminBookingManage() {
 
           <div className="p-4">
             {activeTab === "deposit" &&
-              renderList(
-                depositList,
-                "Hiện chưa có phòng nào đang được đặt cọc."
-              )}
+              renderList(depositList, "Hiện chưa có phòng nào đang được đặt cọc.")}
 
             {activeTab === "confirmed" && (
               <>
-                {/* Ô tìm theo số điện thoại */}
                 <div className="mb-3 flex justify-start">
                   <input
                     type="text"
@@ -349,6 +321,6 @@ export default function AdminBookingManage() {
           </div>
         </div>
       </main>
-    </div>
+    </AdminPageLayout>
   );
 }
