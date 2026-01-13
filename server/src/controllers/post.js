@@ -422,3 +422,28 @@ exports.deletePostByAdmin = async (req, res) => {
     });
   }
 };
+exports.createReport = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Bạn chưa đăng nhập" });
+    }
+
+    const postId = req.params.id;
+    const report = await postService.createReportForPost(postId, req.body, userId);
+
+    return res.status(201).json({
+      success: true,
+      data: { id: report.id },
+      message: "Gửi phản ánh thành công",
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: err.message || "Internal server error",
+    });
+  }
+};

@@ -48,11 +48,11 @@ export default function AuthPage() {
           </div>
 
           {/* Body */}
-          <div className="p-8">
-            {isRegister ? <RegisterForm /> : <LoginForm />}
-          </div>
+          <div className="p-8">{isRegister ? <RegisterForm /> : <LoginForm />}</div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }
@@ -93,6 +93,7 @@ function LoginForm() {
 
     try {
       setLoading(true);
+
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,12 +103,19 @@ function LoginForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Đăng nhập thất bại");
 
+      const role = Number(data?.user?.role ?? 0);
+
+      // ✅ Chặn tài khoản bị vô hiệu hóa
+      if (role === 3) {
+        setError("Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.");
+        return;
+      }
+
       // lưu vào context + localStorage
       login({ token: data.token, user: data.user });
 
       // điều hướng theo role
-      const role = Number(data?.user?.role ?? 0);
-      if (role === 2) navigate("/admin", { replace: true });
+      if (role === 2) navigate("/admin/dashboard", { replace: true });
       else navigate("/", { replace: true });
     } catch (err) {
       setError(err.message);
@@ -167,14 +175,14 @@ function RegisterForm() {
 
     try {
       setLoading(true);
+
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // gửi role theo lựa chọn
         body: JSON.stringify({ name, phone, password: pw, role }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Đăng ký thất bại");
 
       setSuccess("Đăng ký thành công! Đang chuyển sang đăng nhập…");
@@ -219,11 +227,11 @@ function RegisterForm() {
         <div className="grid grid-cols-2 gap-3">
           <label
             className={`border rounded-xl px-4 py-3 cursor-pointer transition
-                             ${
-                               role === 0
-                                 ? "border-orange-400 bg-orange-50"
-                                 : "border-gray-200 hover:bg-gray-50"
-                             }`}
+              ${
+                role === 0
+                  ? "border-orange-400 bg-orange-50"
+                  : "border-gray-200 hover:bg-gray-50"
+              }`}
           >
             <div className="flex items-center gap-3">
               <input
@@ -242,11 +250,11 @@ function RegisterForm() {
 
           <label
             className={`border rounded-xl px-4 py-3 cursor-pointer transition
-                             ${
-                               role === 1
-                                 ? "border-orange-400 bg-orange-50"
-                                 : "border-gray-200 hover:bg-gray-50"
-                             }`}
+              ${
+                role === 1
+                  ? "border-orange-400 bg-orange-50"
+                  : "border-gray-200 hover:bg-gray-50"
+              }`}
           >
             <div className="flex items-center gap-3">
               <input
@@ -276,8 +284,8 @@ function RegisterForm() {
       </button>
 
       <p className="mt-4 text-xs text-gray-500 leading-5">
-        Qua việc đăng nhập hoặc tạo tài khoản, bạn đồng ý với các điều khoản
-        sử dụng và chính sách bảo mật.
+        Qua việc đăng nhập hoặc tạo tài khoản, bạn đồng ý với các điều khoản sử
+        dụng và chính sách bảo mật.
       </p>
     </form>
   );

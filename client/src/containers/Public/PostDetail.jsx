@@ -21,15 +21,26 @@ import ReportModal from "../../utils/ReportModal.jsx";
 import { useAuth } from "./AuthContext.jsx";
 
 // 🔥 service bình luận
-import {
-  listComments,
-  createComment,
-} from "../../services/commentService.js";
+import { listComments, createComment } from "../../services/commentService.js";
+
+// ✅ DM service
+import { dmGetOrCreateConversation } from "../../services/chatService";
+
+// ✅ chat widgets
+import ChatDMWidget from "../../components/chat/ChatDMWidget";
+import ChatSupport from "../../components/chat/ChatSupport";
 
 // 👉 BASE API cho ảnh/video
-const API_BASE = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
-).replace(/\/+$/, "");
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/+$/, "");
+
+function getTokenFallback() {
+  return (
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("authToken") ||
+    ""
+  );
+}
 
 function resolveMediaUrl(raw) {
   if (!raw) return null;
@@ -44,7 +55,7 @@ function resolveMediaUrl(raw) {
         (u.hostname === "localhost" || u.hostname.startsWith("127.")) &&
         u.pathname.startsWith("/uploads/")
       ) {
-        // Ép host sang API_BASE (devtunnel backend)
+        // Ép host sang API_BASE
         return `${API_BASE}${u.pathname}`;
       }
 
@@ -88,35 +99,15 @@ const CleanPhone = (s = "") => (s.match(/\d+/g) || []).join("");
 
 // logo + màu tiêu đề theo label
 const LABEL_CONFIG = {
-  HOT: {
-    color: "#e53935",
-    icon: HotLabel,
-  },
-  VIP1: {
-    color: "#e83e8c",
-    icon: Vip1Label,
-  },
-  VIP2: {
-    color: "#f9a825",
-    icon: Vip2Label,
-  },
-  VIP3: {
-    color: "#1a73e8",
-    icon: Vip3Label,
-  },
-  DEFAULT: {
-    color: "#8b5e3c",
-    icon: DefaultLabel,
-  },
+  HOT: { color: "#e53935", icon: HotLabel },
+  VIP1: { color: "#e83e8c", icon: Vip1Label },
+  VIP2: { color: "#f9a825", icon: Vip2Label },
+  VIP3: { color: "#1a73e8", icon: Vip3Label },
+  DEFAULT: { color: "#8b5e3c", icon: DefaultLabel },
 };
 
 function getLabelInfo(post) {
-  const raw =
-    (post?.label ||
-      post?.labelCode ||
-      post?.labelType ||
-      post?.labelName ||
-      "") + "";
+  const raw = (post?.label || post?.labelCode || post?.labelType || post?.labelName || "") + "";
   const key = raw.toUpperCase();
   if (key === "HOT") return LABEL_CONFIG.HOT;
   if (key === "VIP1") return LABEL_CONFIG.VIP1;
@@ -128,7 +119,9 @@ function getLabelInfo(post) {
 export default function PostDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const auth = useAuth?.() || {};
+  const user = auth.user || null;
+  const token = auth.token || getTokenFallback();
 
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -188,7 +181,7 @@ export default function PostDetail() {
   const handleSubmitComment = async (e) => {
     e.preventDefault();
 
-    if (!user || user.role !== 0) {
+    if (!user || Number(user.role) !== 0) {
       alert("Chỉ tài khoản Người thuê trọ mới có thể bình luận.");
       return;
     }
@@ -199,9 +192,7 @@ export default function PostDetail() {
     }
 
     if (!user.name) {
-      alert(
-        "Vui lòng cập nhật họ tên trong hồ sơ tài khoản trước khi bình luận."
-      );
+      alert("Vui lòng cập nhật họ tên trong hồ sơ tài khoản trước khi bình luận.");
       return;
     }
 
@@ -214,7 +205,6 @@ export default function PostDetail() {
         userId: user.id,
       });
 
-      // thêm bình luận mới lên đầu
       setComments((prev) => [newComment, ...prev]);
       setCommentContent("");
     } catch (err) {
@@ -225,16 +215,13 @@ export default function PostDetail() {
     }
   };
 
-  // ✅ Chuẩn hoá images & videos (fix /uploads/... cho mọi máy)
+  // ✅ Chuẩn hoá images & videos
   const normalizedImages = useMemo(() => {
     if (!post || !Array.isArray(post.images)) return post?.images;
     return post.images.map((img) => {
-      if (typeof img === "string") {
-        return resolveMediaUrl(img);
-      }
+      if (typeof img === "string") return resolveMediaUrl(img);
       const url = img?.url || img?.src;
       const resolved = resolveMediaUrl(url);
-      // giữ nguyên các field khác nếu có
       return { ...img, url: resolved };
     });
   }, [post]);
@@ -242,9 +229,7 @@ export default function PostDetail() {
   const normalizedVideos = useMemo(() => {
     if (!post || !Array.isArray(post.videos)) return post?.videos;
     return post.videos.map((v) => {
-      if (typeof v === "string") {
-        return resolveMediaUrl(v);
-      }
+      if (typeof v === "string") return resolveMediaUrl(v);
       const url = v?.url || v?.src;
       const resolved = resolveMediaUrl(url);
       return { ...v, url: resolved, src: resolved || v.src };
@@ -280,15 +265,60 @@ export default function PostDetail() {
 
   const zalo = `https://zalo.me/${CleanPhone(post.contactPhone)}`;
   const { color: titleColor, icon: labelIcon } = getLabelInfo(post);
-  const isLandlord = user?.role === 1;
-  const canComment = user && user.role === 0;
+  const isLandlord = Number(user?.role) === 1;
+  const canComment = user && Number(user.role) === 0;
+
+  // ✅ lấy id chủ bài (support nhiều kiểu field)
+  const ownerId =
+    Number(post.userId) ||
+    Number(post.user_id) ||
+    Number(post.ownerId) ||
+    Number(post.owner_id) ||
+    Number(post?.user?.id) ||
+    0;
+
+  // ✅ CHAT: tạo hội thoại DM với chủ bài và mở widget
+  const handleChatWithOwner = async () => {
+    if (!user) {
+      navigate("/dang-nhap-tai-khoan");
+      return;
+    }
+    if (Number(user.role) !== 0) {
+      alert("Chỉ tài khoản Người thuê trọ mới có thể chat trực tuyến.");
+      return;
+    }
+    if (!token) {
+      alert("Thiếu token đăng nhập. Hãy đăng nhập lại.");
+      return;
+    }
+    if (!ownerId) {
+      alert("Không xác định được chủ bài đăng để chat.");
+      return;
+    }
+    if (Number(ownerId) === Number(user.id)) {
+      alert("Bạn đang là chủ bài đăng.");
+      return;
+    }
+
+    try {
+      const res = await dmGetOrCreateConversation(token, ownerId);
+      const convId = res?.data?.id || res?.data?.conversation?.id || res?.id;
+      if (!convId) throw new Error("Không tạo/mở được hội thoại.");
+
+      // ✅ gọi event để DM widget tự bật + mở đúng hội thoại
+      window.dispatchEvent(
+        new CustomEvent("dm:open", { detail: { conversationId: Number(convId) } })
+      );
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Không mở được chat.");
+    }
+  };
 
   // callback sau khi modal gắn nhãn / gia hạn / ẩn tin
   const handleLabelUpdated = (payload) => {
     if (!payload) return;
-    setPost((prev) =>
-      prev ? { ...prev, labelCode: payload.labelCode } : prev
-    );
+    setPost((prev) => (prev ? { ...prev, labelCode: payload.labelCode } : prev));
   };
 
   const handleExtendUpdated = (payload) => {
@@ -313,24 +343,18 @@ export default function PostDetail() {
   // callback sau khi đặt phòng xong -> cập nhật trạng thái bài
   const handleBooked = (payload) => {
     if (!payload) return;
-    setPost((prev) =>
-      prev ? { ...prev, status: payload.status || "booking" } : prev
-    );
+    setPost((prev) => (prev ? { ...prev, status: payload.status || "booking" } : prev));
   };
 
   const handleClickBooking = () => {
-    // chưa đăng nhập
     if (!user) {
       navigate("/dang-nhap-tai-khoan");
       return;
     }
-
-    // chỉ role 0 (người thuê) mới được đặt phòng
-    if (user.role !== 0) {
+    if (Number(user.role) !== 0) {
       alert("Chỉ tài khoản Người thuê trọ mới có thể đặt phòng.");
       return;
     }
-
     setBookingModalOpen(true);
   };
 
@@ -354,48 +378,32 @@ export default function PostDetail() {
           {/* Title + price + area + address + time */}
           <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-3">
-              {labelIcon && (
-                <img
-                  src={labelIcon}
-                  alt="Loại tin"
-                  className="w-9 h-9 object-contain"
-                />
-              )}
-              <h1
-                className="text-2xl font-semibold"
-                style={{ color: titleColor }}
-              >
+              {labelIcon && <img src={labelIcon} alt="Loại tin" className="w-9 h-9 object-contain" />}
+              <h1 className="text-2xl font-semibold" style={{ color: titleColor }}>
                 {post.title}
               </h1>
             </div>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]">
-              <span className="text-emerald-600 font-semibold">
-                {formatPrice(post.price)}
-              </span>
+              <span className="text-emerald-600 font-semibold">{formatPrice(post.price)}</span>
               <span className="text-gray-600">{formatArea(post.area)}</span>
               <span className="text-gray-400">•</span>
               <span className="text-gray-600">{timeAgo(post.createdAt)}</span>
             </div>
 
-            {/* Địa chỉ: địa chỉ nằm dưới tỉnh thành */}
             <div className="mt-1 space-y-2 text-[15px]">
               <div className="flex items-start gap-2">
                 <span className="mt-0.5">🏙️</span>
                 <div>
                   <div className="text-gray-500">Tỉnh thành</div>
-                  <div className="text-gray-800">
-                    {post.province || "—"}
-                  </div>
+                  <div className="text-gray-800">{post.province || "—"}</div>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="mt-0.5">📍</span>
                 <div>
                   <div className="text-gray-500">Địa chỉ</div>
-                  <div className="text-gray-800">
-                    {post.address || "—"}
-                  </div>
+                  <div className="text-gray-800">{post.address || "—"}</div>
                 </div>
               </div>
             </div>
@@ -405,9 +413,7 @@ export default function PostDetail() {
           {post.description && (
             <div className="bg-white border border-gray-200 rounded-2xl p-5">
               <h3 className="font-semibold text-lg mb-3">Thông tin mô tả</h3>
-              <div className="whitespace-pre-line leading-7 text-gray-800">
-                {post.description}
-              </div>
+              <div className="whitespace-pre-line leading-7 text-gray-800">{post.description}</div>
             </div>
           )}
 
@@ -428,7 +434,7 @@ export default function PostDetail() {
             </div>
           )}
 
-          {/* Map + Contact (bên dưới map) */}
+          {/* Map + Contact */}
           {(post.address || post.province) && (
             <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
               <div className="flex items-center gap-2">
@@ -436,27 +442,19 @@ export default function PostDetail() {
               </div>
               {mapSrc ? (
                 <div className="w-full h-[320px] rounded-xl overflow-hidden border">
-                  <iframe
-                    src={mapSrc}
-                    className="w-full h-full border-0"
-                    loading="lazy"
-                    title="Bản đồ"
-                  />
+                  <iframe src={mapSrc} className="w-full h-full border-0" loading="lazy" title="Bản đồ" />
                 </div>
               ) : (
                 <div className="text-gray-500">Chưa có địa chỉ bản đồ.</div>
               )}
 
-              {/* Contact 2 (dưới map) */}
               <div className="mt-2 border-t pt-4">
                 <h4 className="font-semibold mb-3">Thông tin liên hệ</h4>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100">
                     👤
                   </span>
-                  <span className="font-medium">
-                    {post.contactName || "—"}
-                  </span>
+                  <span className="font-medium">{post.contactName || "—"}</span>
                   {post.contactPhone && (
                     <>
                       <a
@@ -486,19 +484,24 @@ export default function PostDetail() {
           {/* Người thuê trọ (role 0) / khách */}
           {!isLandlord ? (
             <div className="space-y-4 sticky top-6">
-              {/* Khung chức năng — phiên bản thu gọn */}
               <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4">
                 <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-14 h-14 rounded-full bg-gray-100 grid place-items-center text-xl">
-                    👤
-                  </div>
-                  <div className="text-base font-semibold">
-                    {post.contactName || "—"}
-                  </div>
-                  
+                  <div className="w-14 h-14 rounded-full bg-gray-100 grid place-items-center text-xl">👤</div>
+                  <div className="text-base font-semibold">{post.contactName || "—"}</div>
                 </div>
 
                 <div className="flex flex-col gap-2 text-sm">
+                  {/* ✅ Chat trực tuyến (role=0) */}
+                  {Number(user?.role) === 0 && (
+                    <button
+                      type="button"
+                      className="w-full grid place-items-center rounded-xl h-10 bg-white border border-orange-300 text-orange-600 hover:bg-orange-50 font-medium"
+                      onClick={handleChatWithOwner}
+                    >
+                      Chat trực tuyến
+                    </button>
+                  )}
+
                   {post.contactPhone && (
                     <a
                       href={`tel:${post.contactPhone}`}
@@ -535,29 +538,20 @@ export default function PostDetail() {
                 </div>
               </div>
 
-              {/* Khung bình luận — chỉ phía người thuê / khách */}
+              {/* Bình luận */}
               <div className="bg-white border border-gray-200 rounded-2xl p-4 text-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-[15px]">Bình luận</h3>
                   {comments.length > 0 && (
-                    <span className="text-xs text-gray-500">
-                      {comments.length} bình luận
-                    </span>
+                    <span className="text-xs text-gray-500">{comments.length} bình luận</span>
                   )}
                 </div>
 
-                {/* Form bình luận */}
                 {canComment ? (
-                  <form
-                    onSubmit={handleSubmitComment}
-                    className="space-y-2 mb-3"
-                  >
+                  <form onSubmit={handleSubmitComment} className="space-y-2 mb-3">
                     <div className="text-xs text-gray-500">
                       Bình luận dưới tên{" "}
-                      <span className="font-medium text-gray-800">
-                        {user.name || "(Chưa có tên)"}
-                      </span>
-                      .
+                      <span className="font-medium text-gray-800">{user.name || "(Chưa có tên)"}</span>.
                     </div>
 
                     <textarea
@@ -569,9 +563,7 @@ export default function PostDetail() {
                     />
 
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">
-                        Không chia sẻ thông tin nhạy cảm.
-                      </span>
+                      <span className="text-[11px] text-gray-400">Không chia sẻ thông tin nhạy cảm.</span>
                       <button
                         type="submit"
                         className="px-3 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium disabled:opacity-60"
@@ -584,9 +576,7 @@ export default function PostDetail() {
                 ) : (
                   <div className="mb-3 text-xs text-gray-500 space-y-1">
                     <p>
-                      Đăng nhập bằng tài khoản{" "}
-                      <b className="text-gray-800">Người thuê trọ</b> để viết
-                      bình luận.
+                      Đăng nhập bằng tài khoản <b className="text-gray-800">Người thuê trọ</b> để viết bình luận.
                     </p>
                     {!user && (
                       <button
@@ -600,45 +590,27 @@ export default function PostDetail() {
                   </div>
                 )}
 
-                {/* Danh sách bình luận */}
                 {commentLoading && comments.length === 0 && (
-                  <p className="text-xs text-gray-400">
-                    Đang tải bình luận...
-                  </p>
+                  <p className="text-xs text-gray-400">Đang tải bình luận...</p>
                 )}
 
                 {!commentLoading && comments.length === 0 && (
-                  <p className="text-xs text-gray-500">
-                    Chưa có bình luận nào. Hãy là người đầu tiên!
-                  </p>
+                  <p className="text-xs text-gray-500">Chưa có bình luận nào. Hãy là người đầu tiên!</p>
                 )}
 
                 {comments.length > 0 && (
                   <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                     {comments.map((c) => {
                       const displayName =
-                        c.userName ||
-                        c.user_name ||
-                        c.name ||
-                        (c.user && c.user.name) ||
-                        "Ẩn danh";
+                        c.userName || c.user_name || c.name || (c.user && c.user.name) || "Ẩn danh";
 
                       return (
-                        <div
-                          key={c.id}
-                          className="border-t border-gray-100 pt-2 first:border-t-0 first:pt-0"
-                        >
+                        <div key={c.id} className="border-t border-gray-100 pt-2 first:border-t-0 first:pt-0">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-gray-800">
-                              {displayName}
-                            </span>
-                            <span className="text-[11px] text-gray-400">
-                              {timeAgo(c.createdAt)}
-                            </span>
+                            <span className="font-medium text-gray-800">{displayName}</span>
+                            <span className="text-[11px] text-gray-400">{timeAgo(c.createdAt)}</span>
                           </div>
-                          <p className="mt-0.5 text-[13px] text-gray-700 whitespace-pre-line">
-                            {c.content}
-                          </p>
+                          <p className="mt-0.5 text-[13px] text-gray-700 whitespace-pre-line">{c.content}</p>
                         </div>
                       );
                     })}
@@ -647,7 +619,7 @@ export default function PostDetail() {
               </div>
             </div>
           ) : (
-            // Người cho thuê (role 1): 4 chức năng quản lý tin — GIỮ NGUYÊN
+            // Người cho thuê (role 1): giữ nguyên
             <div className="bg-white border border-gray-200 rounded-2xl p-5 sticky top-6 space-y-4">
               <div className="text-center mb-2">
                 <div className="text-sm text-gray-500">
@@ -659,11 +631,7 @@ export default function PostDetail() {
                 <button
                   type="button"
                   className="w-full grid place-items-center rounded-xl h-11 bg-orange-500 hover:bg-orange-600 text-white font-medium"
-                  onClick={() =>
-                    window.location.assign(
-                      `/quan-ly/tin-dang/sua-tin/${post.id}`
-                    )
-                  }
+                  onClick={() => window.location.assign(`/quan-ly/tin-dang/sua-tin/${post.id}`)}
                 >
                   Sửa tin
                 </button>
@@ -697,7 +665,7 @@ export default function PostDetail() {
         </aside>
       </main>
 
-      {/* 5 modal dùng chung */}
+      {/* 5 modal */}
       <LabelModal
         open={labelModalOpen}
         post={post}
@@ -730,6 +698,10 @@ export default function PostDetail() {
       />
 
       <Footer />
+
+      {/* ✅ gắn DM/Admin widget ngay tại PostDetail */}
+      <ChatDMWidget />
+      <ChatSupport />
     </div>
   );
 }

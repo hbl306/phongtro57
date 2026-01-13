@@ -374,3 +374,24 @@ export async function bookPost(id) {
 
   return json;
 }
+/* ----------------------------------------------
+ *  TẠO REPORT (BÁO XẤU)
+ *  POST /api/posts/:id/report
+ * ---------------------------------------------*/
+export async function createReport(postId, payload) {
+  const res = await fetch(`${API_BASE}/api/posts/${postId}/report`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.message || "Gửi phản ánh thất bại");
+  }
+
+  return json;
+}

@@ -1,5 +1,5 @@
 // src/containers/Admin/AdminBookingManage.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../Public/AuthContext.jsx";
 import bookingService from "../../services/bookingService";
@@ -29,6 +29,17 @@ export default function AdminBookingManage() {
   const [err, setErr] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
 
+  // trạng thái gửi tiền cọc
+  const [sendingId, setSendingId] = useState(null);
+
+  // toast
+  const [toast, setToast] = useState({ type: "", msg: "" });
+  const showToast = useCallback((type, msg) => {
+    setToast({ type, msg });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast({ type: "", msg: "" }), 2500);
+  }, []);
+
   // Nếu không phải admin thì quay về /
   useEffect(() => {
     if (!user || Number(user.role) !== 2) {
@@ -36,32 +47,64 @@ export default function AdminBookingManage() {
     }
   }, [user, navigate]);
 
+  // fetchAll để tái dùng sau khi gửi tiền cọc
+  const fetchAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      setErr("");
+
+      const data = await bookingService.adminGetAllBookings();
+      setBookings(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("fetch admin bookings error >>>", e);
+      setErr(e.message || "Không tải được danh sách phòng đặt.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Gọi API lấy danh sách booking cho admin
   useEffect(() => {
     let ignore = false;
 
-    const fetchAll = async () => {
-      try {
-        setLoading(true);
-        setErr("");
+    (async () => {
+      if (ignore) return;
+      await fetchAll();
+    })();
 
-        const data = await bookingService.adminGetAllBookings();
-        if (!ignore) setBookings(Array.isArray(data) ? data : []);
-      } catch (e) {
-        if (!ignore) {
-          console.error("fetch admin bookings error >>>", e);
-          setErr(e.message || "Không tải được danh sách phòng đặt.");
-        }
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    };
-
-    fetchAll();
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [fetchAll]);
+
+  // Handler: admin gửi tiền cọc
+  const handleSendDeposit = async (bookingId) => {
+    if (!bookingId) return;
+
+    try {
+      setSendingId(bookingId);
+      setErr("");
+
+      const res = await bookingService.adminSendDeposit(bookingId);
+
+      showToast("success", res?.message || "Đã gửi tiền cọc thành công.");
+
+      // Update nhanh UI (ẩn nút ngay, badge đổi ngay)
+      setBookings((prev) =>
+        (prev || []).map((b) =>
+          b?.id === bookingId ? { ...b, status: "paid" } : b
+        )
+      );
+
+      // Nếu muốn chắc 100% đúng theo BE (kể cả postStatus/field khác) thì bật dòng này:
+      // await fetchAll();
+    } catch (e) {
+      console.error("adminSendDeposit error >>>", e);
+      showToast("error", e?.message || "Gửi tiền cọc thất bại.");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   // Phân loại: deposit / confirmed+paid
   const { depositList, confirmedAndPaidList } = useMemo(() => {
@@ -132,7 +175,6 @@ export default function AdminBookingManage() {
     if (!Array.isArray(imgs) || imgs.length === 0) return null;
 
     const first = imgs[0];
-    // hỗ trợ cả dạng: { url } và dạng: "filename.jpg" / "http..."
     if (typeof first === "string") return first;
     if (first && typeof first === "object") return first.url || first.path || null;
     return null;
@@ -144,6 +186,7 @@ export default function AdminBookingManage() {
     const thumb = getThumbUrl(post);
 
     const canSendDeposit = showSendDeposit && booking.status === "confirmed";
+    const isSending = sendingId === booking.id;
 
     return (
       <div
@@ -240,14 +283,16 @@ export default function AdminBookingManage() {
             {canSendDeposit && (
               <button
                 type="button"
-                className="px-3 py-1.5 text-xs font-semibold rounded-full bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() =>
-                  alert(
-                    "Chức năng Gửi tiền cọc sẽ được triển khai / nối API ở bước sau."
-                  )
+                disabled={isSending}
+                className={
+                  "px-3 py-1.5 text-xs font-semibold rounded-full text-white " +
+                  (isSending
+                    ? "bg-blue-300 cursor-not-allowed"
+                    : "bg-blue-500 hover:bg-blue-600")
                 }
+                onClick={() => handleSendDeposit(booking.id)}
               >
-                Gửi tiền cọc
+                {isSending ? "Đang gửi..." : "Gửi tiền cọc"}
               </button>
             )}
           </div>
@@ -258,18 +303,29 @@ export default function AdminBookingManage() {
 
   const renderList = (list, emptyText, options = {}) => {
     if (loading)
-      return <p className="text-sm text-gray-500 py-4">Đang tải danh sách phòng đặt…</p>;
+      return (
+        <p className="text-sm text-gray-500 py-4">
+          Đang tải danh sách phòng đặt…
+        </p>
+      );
     if (err) return <p className="text-sm text-red-500 py-4">Lỗi: {err}</p>;
-    if (!list.length) return <p className="text-sm text-gray-500 py-4">{emptyText}</p>;
+    if (!list.length)
+      return <p className="text-sm text-gray-500 py-4">{emptyText}</p>;
 
-    return <div className="space-y-3">{list.map((b) => renderBookingItem(b, options))}</div>;
+    return (
+      <div className="space-y-3">
+        {list.map((b) => renderBookingItem(b, options))}
+      </div>
+    );
   };
 
   return (
     <AdminPageLayout activeKey="bookings">
       <main className="max-w-[1200px] mx-auto px-0 py-2">
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">Quản lý phòng đặt</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            Quản lý phòng đặt
+          </h1>
           <p className="text-sm text-gray-600 mt-1">
             Theo dõi các phòng đang được đặt cọc và đã xác nhận.
           </p>
@@ -294,6 +350,20 @@ export default function AdminBookingManage() {
           </div>
 
           <div className="p-4">
+            {/* Toast */}
+            {toast.msg && (
+              <div
+                className={
+                  "mb-3 rounded-xl px-4 py-2 text-sm border " +
+                  (toast.type === "success"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-red-50 text-red-700 border-red-200")
+                }
+              >
+                {toast.msg}
+              </div>
+            )}
+
             {activeTab === "deposit" &&
               renderList(depositList, "Hiện chưa có phòng nào đang được đặt cọc.")}
 

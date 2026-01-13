@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const db = require('../models');
-const { Post, Image, Video, User, WalletHistory, Booking } = db;
+const { Post, Image, Video, User, WalletHistory, Booking , Report} = db;
 
 /* ---------- cost nhãn ---------- */
 const LABEL_COST = {
@@ -987,22 +987,70 @@ exports.bookPost = async (postId, userId) => {
     throw err;
   }
 };
-
-/* ============================================================
- *  Các hàm dành riêng cho ADMIN
- * ==========================================================*/
-exports.approvePostByAdmin = async (postId) => {
+// ============ REPORT (tenant gửi báo xấu) ============
+exports.createReportForPost = async (postId, payload, reporterUserId) => {
   const post = await Post.findByPk(postId);
-  if (!post) return null;
+  if (!post) {
+    const err = new Error("Không tìm thấy bài đăng để phản ánh");
+    err.status = 404;
+    throw err;
+  }
 
-  post.status = 'approved';
-  post.star = 3;
+  const reason = payload?.reason;
+  const description = payload?.description || null;
 
-  await post.save();
-  return post;
+  const reporterName =
+    payload?.reporter_name || payload?.reporterName || payload?.name || "";
+  const reporterPhone =
+    payload?.reporter_phone || payload?.reporterPhone || payload?.phone || "";
+
+  if (!reason) {
+    const err = new Error("Thiếu lý do phản ánh");
+    err.status = 400;
+    throw err;
+  }
+  if (!String(reporterName).trim() || !String(reporterPhone).trim()) {
+    const err = new Error("Vui lòng nhập đầy đủ họ tên và số điện thoại");
+    err.status = 400;
+    throw err;
+  }
+
+  const report = await Report.create({
+    postId,
+    reporterUserId: reporterUserId || null,
+    reporterName: String(reporterName).trim(),
+    reporterPhone: String(reporterPhone).trim(),
+    reason,
+    description: description ? String(description).trim() : null,
+    status: "new",
+  });
+
+  return report;
 };
 
+
+/* ============================================================
+ *  (NÂNG CẤP) deletePostByAdmin: xóa luôn reports + images + videos
+ * ==========================================================*/
 exports.deletePostByAdmin = async (postId) => {
-  const deletedCount = await Post.destroy({ where: { id: postId } });
-  return { success: deletedCount > 0 };
+  const t = await db.sequelize.transaction();
+  try {
+    // dọn các bảng con
+    await Report.destroy({ where: { postId }, transaction: t });
+    await Image.destroy({ where: { postId }, transaction: t });
+    await Video.destroy({ where: { postId }, transaction: t });
+    if (Booking) await Booking.destroy({ where: { postId }, transaction: t });
+
+    // xóa post
+    const deletedCount = await Post.destroy({
+      where: { id: postId },
+      transaction: t,
+    });
+
+    await t.commit();
+    return { success: deletedCount > 0 };
+  } catch (err) {
+    await t.rollback();
+    throw err;
+  }
 };

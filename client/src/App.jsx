@@ -80,7 +80,7 @@ export default function App() {
     <Routes>
       {/* Admin */}
       <Route
-        path="/admin"
+        path="/admin/dashboard"
         element={
           <AdminRoute>
             <AdminHomeShell />

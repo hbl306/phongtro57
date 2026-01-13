@@ -1,6 +1,7 @@
 // src/utils/ReportModal.jsx
 import React, { useEffect, useState } from "react";
 import Modal from "../components/ui/Modal.jsx";
+import { createReport } from "../services/postService.js";
 
 const REASONS = [
   { value: "fraud", label: "Tin có dấu hiệu lừa đảo" },
@@ -20,15 +21,26 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Prefill tên + sđt nếu user đã đăng nhập
   useEffect(() => {
-    if (open && currentUser) {
+    if (!open) return;
+
+    setReason(REASONS[0].value);
+    setDescription("");
+
+    if (currentUser) {
       setName(currentUser.name || "");
       setPhone(currentUser.phone || "");
+    } else {
+      setName("");
+      setPhone("");
     }
   }, [open, currentUser]);
 
   const handleSubmit = async () => {
+    if (!post?.id) {
+      alert("Không xác định được bài đăng để phản ánh.");
+      return;
+    }
     if (!reason) {
       alert("Vui lòng chọn lý do phản ánh.");
       return;
@@ -41,9 +53,12 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
     try {
       setSubmitting(true);
 
-      // TODO: gọi API lưu báo xấu khi bạn làm backend.
-      // Tạm thời chỉ giả lập:
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await createReport(post.id, {
+        reason,
+        description,
+        reporter_name: name.trim(),
+        reporter_phone: phone.trim(),
+      });
 
       setSubmitting(false);
       onClose?.();
@@ -51,7 +66,7 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
     } catch (err) {
       console.error("Gửi báo xấu lỗi:", err);
       setSubmitting(false);
-      alert("Gửi báo xấu thất bại. Vui lòng thử lại.");
+      alert(err?.message || "Gửi báo xấu thất bại. Vui lòng thử lại.");
     }
   };
 
@@ -90,15 +105,11 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
           </p>
         )}
 
-        {/* Lý do */}
         <div>
           <div className="font-semibold mb-2">Lý do phản ánh:</div>
           <div className="space-y-2">
             {REASONS.map((r) => (
-              <label
-                key={r.value}
-                className="flex items-center gap-2 cursor-pointer"
-              >
+              <label key={r.value} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   className="accent-orange-500"
@@ -111,7 +122,6 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
           </div>
         </div>
 
-        {/* Mô tả thêm */}
         <div>
           <div className="font-semibold mb-2">Mô tả thêm</div>
           <textarea
@@ -123,7 +133,6 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
           />
         </div>
 
-        {/* Thông tin liên hệ */}
         <div className="border-t pt-3 space-y-3">
           <div className="font-semibold text-sm">Thông tin liên hệ</div>
           <div className="space-y-2">
@@ -143,8 +152,7 @@ export default function ReportModal({ open, onClose, post, currentUser }) {
             />
           </div>
           <p className="text-[11px] text-gray-400">
-            Chúng tôi chỉ sử dụng thông tin liên hệ để xác minh & hỗ trợ thêm khi
-            cần thiết.
+            Chúng tôi chỉ sử dụng thông tin liên hệ để xác minh & hỗ trợ thêm khi cần thiết.
           </p>
         </div>
       </div>

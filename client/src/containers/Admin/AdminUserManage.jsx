@@ -3,9 +3,19 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../Public/AuthContext.jsx";
 import AdminPageLayout from "./AdminPageLayout.jsx";
 
+// Base URL cho API (env trước, localhost sau)
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 function EmptyState() {
   return <div className="text-sm text-gray-500">Không tìm thấy tài khoản.</div>;
 }
+
+const ROLE_LABEL = {
+  0: "Người thuê trọ (0)",
+  1: "Người cho thuê (1)",
+  2: "Quản trị viên (2)",
+  3: "Vô hiệu hóa (3)",
+};
 
 export default function AdminUserManage() {
   const { token } = useAuth();
@@ -28,16 +38,19 @@ export default function AdminUserManage() {
     setLoading(true);
     setErr("");
     try {
-      const url = new URL("http://localhost:5000/api/admin/users");
+      const url = new URL(`${API_BASE}/api/admin/users`);
       if (phone) url.searchParams.set("phone", phone);
+
       const res = await fetch(url.toString(), {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Không tải được danh sách");
+
       setUsers(Array.isArray(data.data) ? data.data : []);
     } catch (e) {
       setErr(e.message);
@@ -62,7 +75,7 @@ export default function AdminUserManage() {
       name: u.name,
       phone: u.phone,
       password: "",
-      role: u.role,
+      role: Number(u.role ?? 0),
       money: u.money,
     });
     setShowModal(true);
@@ -80,8 +93,8 @@ export default function AdminUserManage() {
 
       const isNew = !editUser.id;
       const url = isNew
-        ? "http://localhost:5000/api/admin/users"
-        : `http://localhost:5000/api/admin/users/${editUser.id}`;
+        ? `${API_BASE}/api/admin/users`
+        : `${API_BASE}/api/admin/users/${editUser.id}`;
       const method = isNew ? "POST" : "PUT";
 
       const res = await fetch(url, {
@@ -92,6 +105,7 @@ export default function AdminUserManage() {
         },
         body: JSON.stringify(payload),
       });
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Lưu thất bại");
 
@@ -109,18 +123,17 @@ export default function AdminUserManage() {
 
   const doDelete = async () => {
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/admin/users/${deletingUser.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/admin/users/${deletingUser.id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Xoá thất bại");
+
       setConfirmOpen(false);
       setDeletingUser(null);
       fetchList(qPhone.trim());
@@ -157,6 +170,7 @@ export default function AdminUserManage() {
                 Tìm
               </button>
             </form>
+
             <button
               onClick={openCreate}
               className="px-4 py-2 bg-green-500 text-white rounded-full text-sm shadow-sm hover:bg-green-600 transition"
@@ -184,13 +198,14 @@ export default function AdminUserManage() {
                     <div className="w-8 h-8 rounded-full bg-[#ffede1] flex items-center justify-center text-xs font-semibold text-[#ff5e2e]">
                       {idx + 1}
                     </div>
+
                     <div>
                       <div className="font-semibold text-gray-900">
                         {u.name || "—"}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {u.phone} • Vai trò: {u.role} • Số dư:{" "}
-                        {Number(u.money).toLocaleString("vi-VN")}đ
+                        {u.phone} • Vai trò: {ROLE_LABEL[Number(u.role)] ?? u.role} •
+                        Số dư: {Number(u.money).toLocaleString("vi-VN")}đ
                       </div>
                     </div>
                   </div>
@@ -271,7 +286,7 @@ export default function AdminUserManage() {
               <div>
                 <label className="text-xs text-gray-600">Vai trò</label>
                 <select
-                  value={editUser.role}
+                  value={Number(editUser.role)}
                   onChange={(e) =>
                     setEditUser({
                       ...editUser,
@@ -283,6 +298,7 @@ export default function AdminUserManage() {
                   <option value={0}>Người thuê trọ (0)</option>
                   <option value={1}>Người cho thuê (1)</option>
                   <option value={2}>Quản trị viên (2)</option>
+                  <option value={3}>Vô hiệu hóa (3)</option>
                 </select>
               </div>
 

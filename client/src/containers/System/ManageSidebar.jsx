@@ -71,6 +71,12 @@ export default function ManageSidebar() {
         label: "Phòng đang đặt cọc",
         icon: "📂",
       },
+       {
+        // route riêng cho ROLE 0
+        to: "/quan-ly/tin-da-luu",
+        label: "Tin đã lưu",
+        icon: "💾",
+      },
       ...commonMenu,
     ];
   }

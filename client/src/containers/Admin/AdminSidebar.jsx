@@ -2,7 +2,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 
 export const ADMIN_NAV_ITEMS = [
-  { key: "dashboard", label: "Dashboard", path: "/admin" },
+  { key: "dashboard", label: "Dashboard", path: "/admin/dashboard" },
   { key: "posts", label: "Quản lý bài đăng", path: "/admin/posts" },
   {
     key: "bookings",

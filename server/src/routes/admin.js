@@ -5,6 +5,7 @@ const postCtrl = require('../controllers/post');
 const bookingController = require('../controllers/booking');
 const adminUserCtrl = require('../controllers/user'); 
 const adminCtrl = require('../controllers/admin');
+const adminReportCtrl = require("../controllers/admin_report");
 
 const router = express.Router();
 /**
@@ -32,6 +33,13 @@ router.patch('/posts/:id/approve', verifyToken, postCtrl.approvePost);
  * DELETE /api/admin/posts/:id
  */
 router.delete('/posts/:id', verifyToken, postCtrl.deletePostByAdmin);
+
+// GET /api/admin/reports?status=new|resolved
+router.get("/reports", verifyToken, adminReportCtrl.getReports);
+
+// PATCH /api/admin/reports/:postId/hide  (ẩn bài + resolve report)
+router.patch("/reports/:postId/hide", verifyToken, adminReportCtrl.hidePostFromReports);
+
 
 /* ===== bookings (you already had) ===== */
 router.get('/bookings', verifyToken, bookingController.adminGetAllBookings);

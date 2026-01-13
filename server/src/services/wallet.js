@@ -14,7 +14,7 @@ exports.getUserWalletHistory = async (userId) => {
   if (!userId) return [];
 
   const rows = await WalletHistory.findAll({
-    where: { userId },        // trong model history đã mapping userId ↔ user_id
+    where: { userId }, // trong model history đã mapping userId ↔ user_id
     order: [['createdAt', 'DESC']],
   });
 
@@ -37,6 +37,13 @@ exports.getUserWalletHistory = async (userId) => {
  * Tạo 1 lệnh nạp tiền VietQR cho user
  * -> lưu vào bảng wallet_topups
  * -> trả về thông tin để FE hiển thị QR
+ *
+ * ✅ CÁCH A: trả đúng format FE đang dùng:
+ * {
+ *   id, amount, code,
+ *   bank: { bankCode, bankName, accountNumber, accountName },
+ *   qrUrl
+ * }
  */
 exports.createVietQRTopupForUser = async (userId, rawAmount) => {
   if (!userId) {
@@ -60,23 +67,49 @@ exports.createVietQRTopupForUser = async (userId, rawAmount) => {
   });
 
   // Thông tin tài khoản nhận tiền (env hoặc fallback)
+  // ✅ Ưu tiên TOPUP_* (chuẩn), fallback RECHARGE_* (nếu bạn đang dùng key cũ)
   const bankAccountNumber =
-    process.env.TOPUP_BANK_ACCOUNT || '5210386707';
+    process.env.TOPUP_BANK_ACCOUNT ||
+    process.env.RECHARGE_BANK_ACCOUNT ||
+    '5210386707';
+
   const bankAccountName =
-    process.env.TOPUP_BANK_ACCOUNT_NAME || 'NGUYEN QUOC DAI';
-  const bankCode = process.env.TOPUP_BANK_CODE || 'BIDV';
+    process.env.TOPUP_BANK_ACCOUNT_NAME ||
+    process.env.RECHARGE_BANK_ACCOUNT_NAME ||
+    process.env.RECHARGE_BANK_NAME || // fallback thêm nếu đặt nhầm
+    'NGUYEN QUOC DAI';
+
+  const bankCode =
+    process.env.TOPUP_BANK_CODE ||
+    process.env.RECHARGE_BANK_CODE ||
+    'BIDV';
+
   const bankName =
-    process.env.TOPUP_BANK_NAME_DISPLAY || 'BIDV';
+    process.env.TOPUP_BANK_NAME_DISPLAY ||
+    process.env.RECHARGE_BANK_NAME_DISPLAY ||
+    'BIDV';
 
   // Link ảnh QR từ VietQR
   const qrImageUrl = `https://img.vietqr.io/image/${bankCode}-${bankAccountNumber}-qr_only.png?amount=${amount}&addInfo=${encodeURIComponent(
     code
   )}&accountName=${encodeURIComponent(bankAccountName)}`;
 
+  // ✅ TRẢ ĐÚNG SHAPE FE ĐANG DÙNG
   return {
     id: topup.id,
     amount,
     code,
+
+    bank: {
+      bankCode,
+      bankName,
+      accountNumber: bankAccountNumber,
+      accountName: bankAccountName,
+    },
+
+    qrUrl: qrImageUrl,
+
+    // (Optional) Giữ lại field cũ để không ảnh hưởng nơi khác nếu có dùng
     bankCode,
     bankName,
     bankAccountNumber,
@@ -152,10 +185,7 @@ exports.confirmTopupByCode = async ({ code, amount, bankRef, rawData }) => {
     const balanceAfter = balanceBefore + finalAmount;
 
     // Cập nhật số dư user
-    await user.update(
-      { money: balanceAfter },
-      { transaction: t }
-    );
+    await user.update({ money: balanceAfter }, { transaction: t });
 
     // Cập nhật topup (status + mã tham chiếu + note)
     await topup.update(
@@ -197,6 +227,7 @@ exports.confirmTopupByCode = async ({ code, amount, bankRef, rawData }) => {
 
   return result;
 };
+
 /**
  * Lịch sử nạp tiền của 1 user
  * - Ưu tiên lấy từ wallet_history (action = 'RECHARGE')
@@ -208,7 +239,6 @@ exports.getUserRechargeHistory = async (userId) => {
   // 1. Thử lấy từ bảng wallet_history
   try {
     const logs = await WalletHistory.findAll({
-      // model history dùng field userId (đã map ↔ user_id trong DB)
       where: { userId, action: 'RECHARGE' },
       order: [['createdAt', 'DESC']],
     });
@@ -227,15 +257,11 @@ exports.getUserRechargeHistory = async (userId) => {
       }));
     }
   } catch (e) {
-    console.error(
-      'getUserRechargeHistory from wallet_history error >>>',
-      e
-    );
+    console.error('getUserRechargeHistory from wallet_history error >>>', e);
   }
 
   // 2. Nếu chưa có log trong wallet_history thì đọc từ wallet_topups
   const topups = await WalletTopup.findAll({
-    // bảng wallet_topups dùng cột user_id + status 'success'
     where: { user_id: userId, status: 'success' },
     order: [
       ['completed_at', 'DESC'],
@@ -249,7 +275,7 @@ exports.getUserRechargeHistory = async (userId) => {
     amountIn: Number(t.amount || 0),
     amountOut: 0,
     balanceBefore: null,
-    balanceAfter: null, // bảng topup không có số dư, để null
+    balanceAfter: null,
     refType: 'BANK_VIETQR',
     note: t.provider_note || `Nạp tiền VietQR (${t.code})`,
     createdAt: t.completed_at || t.created_at,

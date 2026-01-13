@@ -9,7 +9,7 @@ export default function AdminPageLayout({ activeKey, children }) {
       <AdminHeader />
 
       {/* Body: sidebar + content */}
-      <div className="flex max-w-[1280px] mx-auto w-full px-4 pb-8 pt-4 gap-5">
+      <div className="sticky top-0 h-screen overflow-y-auto flex max-w-[1280px] mx-auto w-full px-4 pb-8 pt-4 gap-5">
         <AdminSidebar activeKey={activeKey} />
 
         {/* Nội dung trang con */}

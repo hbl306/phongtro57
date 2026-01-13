@@ -88,6 +88,9 @@ router.post("/:id/booking", verifyToken, postCtrl.bookPost);
 
 // ❌ ẨN BÀI THEO ID  (đúng path: /api/posts/:id/hide)
 router.patch("/:id/hide", verifyToken, postCtrl.hidePost);
+// ✅ REPORT / BÁO XẤU BÀI ĐĂNG (cần login)
+router.post("/:id/report", verifyToken, postCtrl.createReport);
+
 
 /* =============== API Upload (nếu FE vẫn dùng chung router này) =============== */
 

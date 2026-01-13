@@ -4,10 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import Header from "../../components/layout/Header";
 import CategoryTabs from "../../components/filters/CategoryTabs";
 import { AreaFilter } from "../../components/filters/AreaFilter";
-import {
-  PriceFilter,
-  AreaPresetFilter,
-} from "../../components/filters/PriceFilter";
+import { PriceFilter, AreaPresetFilter } from "../../components/filters/PriceFilter";
 import ListingGrid from "../../components/listing/ListingGrid";
 import ListingCard from "../../components/listing/ListingCard";
 import Footer from "../../components/layout/Footer";
@@ -15,9 +12,12 @@ import Pagination from "../../components/listing/Pagination";
 import { listPosts } from "../../services/postService";
 import { useAuth } from "./AuthContext.jsx";
 
+// ✅ chat components
+import ChatSupport from "../../components/chat/ChatSupport";
+import ChatDMWidget from "../../components/chat/ChatDMWidget";
+
 const PER_PAGE = 10;
 
-// ưu tiên label: VIP1 > VIP2 > VIP3 > không nhãn
 function labelPriority(labelCode) {
   const code = (labelCode || "").toUpperCase();
   switch (code) {
@@ -39,9 +39,8 @@ export default function HomeShell() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // Lấy filter từ URL
-  const price = sp.get("price"); // "2000000-5000000"
-  const area = sp.get("area"); // "20-30"
+  const price = sp.get("price");
+  const area = sp.get("area");
   const provinceName = sp.get("provinceName") || undefined;
   const district = sp.get("district") || undefined;
   const ward = sp.get("ward") || undefined;
@@ -53,7 +52,6 @@ export default function HomeShell() {
 
   const [page, setPage] = useState(1);
 
-  // Load list bài từ server mỗi khi filter thay đổi
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -90,7 +88,6 @@ export default function HomeShell() {
     featuresParam,
   ]);
 
-  // Khi filter đổi -> reset về trang 1
   useEffect(() => {
     setPage(1);
   }, [
@@ -106,43 +103,30 @@ export default function HomeShell() {
 
   const isLandlord = user?.role === 1;
 
-  // 🔥 Chỉ lấy các bài đang hiển thị trên trang chủ:
-  //    status = pending hoặc approved
   const visiblePosts = useMemo(() => {
-    const active = posts.filter(
-      (p) => p.status === "pending" || p.status === "approved"
-    );
-
-    // người cho thuê (role 1) chỉ thấy tin của mình
+    const active = posts.filter((p) => p.status === "pending" || p.status === "approved");
     if (!isLandlord || !user?.id) return active;
     return active.filter((p) => p.userId === user.id);
   }, [posts, isLandlord, user?.id]);
 
-  // tách tin HOT
   const hotPosts = useMemo(
-    () =>
-      visiblePosts.filter(
-        (p) => (p.labelCode || "").toUpperCase() === "HOT"
-      ),
+    () => visiblePosts.filter((p) => (p.labelCode || "").toUpperCase() === "HOT"),
     [visiblePosts]
   );
 
-  // carousel tin HOT (5s)
   const [hotIndex, setHotIndex] = useState(0);
   useEffect(() => {
     if (!hotPosts.length) return;
 
-    // nếu số lượng tin HOT thay đổi thì đảm bảo index không out of range
     setHotIndex((prev) => (prev >= hotPosts.length ? 0 : prev));
 
     const timer = setInterval(() => {
       setHotIndex((prev) => (prev + 1) % hotPosts.length);
-    }, 5000); // 5s
+    }, 5000);
 
     return () => clearInterval(timer);
   }, [hotPosts.length]);
 
-  // chuyển tin HOT thủ công
   const handleNextHot = () => {
     if (!hotPosts.length) return;
     setHotIndex((prev) => (prev + 1) % hotPosts.length);
@@ -153,11 +137,8 @@ export default function HomeShell() {
     setHotIndex((prev) => (prev - 1 + hotPosts.length) % hotPosts.length);
   };
 
-  // sắp xếp tin còn lại: VIP1 -> VIP2 -> VIP3 -> không nhãn, trong từng nhóm: mới nhất trước
   const normalPosts = useMemo(() => {
-    const nonHot = visiblePosts.filter(
-      (p) => (p.labelCode || "").toUpperCase() !== "HOT"
-    );
+    const nonHot = visiblePosts.filter((p) => (p.labelCode || "").toUpperCase() !== "HOT");
     return nonHot.slice().sort((a, b) => {
       const pa = labelPriority(a.labelCode);
       const pb = labelPriority(b.labelCode);
@@ -169,9 +150,7 @@ export default function HomeShell() {
     });
   }, [visiblePosts]);
 
-  const pageCount = normalPosts.length
-    ? Math.ceil(normalPosts.length / PER_PAGE)
-    : 0;
+  const pageCount = normalPosts.length ? Math.ceil(normalPosts.length / PER_PAGE) : 0;
 
   useEffect(() => {
     if (!pageCount) {
@@ -195,19 +174,18 @@ export default function HomeShell() {
   return (
     <div className="min-h-screen bg-[#f7f8fb]">
       <Header />
+
       <main className="max-w-[1150px] mx-auto px-3 md:px-6 py-6 grid grid-cols-12 gap-6">
         <section className="col-span-12">
           <CategoryTabs />
           <AreaFilter />
         </section>
 
-        {/* Left: Listings */}
         <section className="col-span-12 lg:col-span-8">
           {loading ? (
             <div className="p-10 text-center text-gray-500">Đang tải…</div>
           ) : (
             <>
-              {/* Khung tin HOT nổi bật */}
               {hotPosts.length > 0 && (
                 <div className="mb-5 rounded-2xl border border-red-300 bg-gradient-to-r from-red-50 via-orange-50 to-yellow-50 shadow-md relative">
                   <div className="flex items-center justify-between px-4 py-2 border-b border-red-100 bg-white/70 backdrop-blur">
@@ -218,11 +196,10 @@ export default function HomeShell() {
                       {hotIndex + 1}/{hotPosts.length}
                     </span>
                   </div>
+
                   <div className="p-3 md:p-4 relative">
-                    {/* KHÔNG truyền variant để giữ nguyên UI + icon tim */}
                     <ListingCard post={hotPosts[hotIndex]} />
 
-                    {/* Nút chuyển trái/phải (desktop) */}
                     {hotPosts.length > 1 && (
                       <>
                         <button
@@ -240,7 +217,6 @@ export default function HomeShell() {
                           ›
                         </button>
 
-                        {/* Mobile: nút dưới card */}
                         <div className="flex sm:hidden justify-center gap-4 mt-3">
                           <button
                             type="button"
@@ -263,26 +239,18 @@ export default function HomeShell() {
                 </div>
               )}
 
-              {/* Danh sách còn lại đã ưu tiên VIP1 -> VIP2 -> VIP3 -> không nhãn + phân trang */}
               {normalPosts.length === 0 ? (
-                <div className="p-10 text-center text-gray-500">
-                  Không có bài đăng nào phù hợp.
-                </div>
+                <div className="p-10 text-center text-gray-500">Không có bài đăng nào phù hợp.</div>
               ) : (
                 <>
                   <ListingGrid posts={paginatedPosts} layout="row" />
-                  <Pagination
-                    page={page}
-                    pageCount={pageCount}
-                    onPageChange={setPage}
-                  />
+                  <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 </>
               )}
             </>
           )}
         </section>
 
-        {/* Right: Filters */}
         <aside className="col-span-12 lg:col-span-4 space-y-4">
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h3 className="font-semibold mb-3">Xem theo khoảng giá</h3>
@@ -294,7 +262,13 @@ export default function HomeShell() {
           </div>
         </aside>
       </main>
+
       <Footer />
+
+      {/* ✅ DM (nằm trên) */}
+      <ChatDMWidget />
+      {/* ✅ Admin (nằm dưới) */}
+      <ChatSupport />
     </div>
   );
 }
